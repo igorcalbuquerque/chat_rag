@@ -4,11 +4,12 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api' })
 
-export async function uploadFiles(files, onProgress) {
+export async function uploadFiles(files, onProgress, signal) {
   const form = new FormData()
   for (const file of files) form.append('files', file)
   const { data } = await api.post('/upload', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    signal, // AbortSignal: lets the caller cancel an in-flight upload
     onUploadProgress: (e) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
     },

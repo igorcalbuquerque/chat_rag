@@ -17,11 +17,21 @@ function describeError(err) {
 // real backend error if ingestion fails.
 export default function FileUpload({ onUploaded }) {
   const inputRef = useRef(null)
+  const abortRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [status, setStatus] = useState(null) // {phase, pct?}
   const [error, setError] = useState(null)
+  const [note, setNote] = useState(null)
+
+  const busy =
+    status?.phase === 'uploading' || status?.phase === 'processing'
+
+  function cancelUpload() {
+    abortRef.current?.abort()
+  }
 
   async function handleFiles(fileList) {
+    if (busy) return // one upload at a time
     const files = Array.from(fileList).filter((f) =>
       /\.(pdf|txt|docx)$/i.test(f.name),
     )
@@ -30,11 +40,18 @@ export default function FileUpload({ onUploaded }) {
       return
     }
     setError(null)
+    setNote(null)
     setStatus({ phase: 'uploading', pct: 0 })
+
+    const controller = new AbortController()
+    abortRef.current = controller
     try {
       // Once all bytes are sent, the server is still ingesting -> "processing".
-      const data = await uploadFiles(files, (pct) =>
-        setStatus(pct < 100 ? { phase: 'uploading', pct } : { phase: 'processing' }),
+      const data = await uploadFiles(
+        files,
+        (pct) =>
+          setStatus(pct < 100 ? { phase: 'uploading', pct } : { phase: 'processing' }),
+        controller.signal,
       )
 
       const indexed = (data.files || []).reduce(
@@ -50,8 +67,13 @@ export default function FileUpload({ onUploaded }) {
       onUploaded?.()
     } catch (err) {
       setStatus(null)
-      setError('Falha no upload: ' + describeError(err))
+      if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {
+        setNote('Envio cancelado.')
+      } else {
+        setError('Falha no upload: ' + describeError(err))
+      }
     } finally {
+      abortRef.current = null
       setTimeout(() => setStatus(null), 1500)
     }
   }
@@ -59,17 +81,17 @@ export default function FileUpload({ onUploaded }) {
   return (
     <div className="upload">
       <div
-        className={`dropzone ${dragging ? 'dragging' : ''}`}
-        onClick={() => inputRef.current?.click()}
+        className={`dropzone ${dragging ? 'dragging' : ''} ${busy ? 'disabled' : ''}`}
+        onClick={() => !busy && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault()
-          setDragging(true)
+          if (!busy) setDragging(true)
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault()
           setDragging(false)
-          handleFiles(e.dataTransfer.files)
+          if (!busy) handleFiles(e.dataTransfer.files)
         }}
       >
         <p>📄 Arraste arquivos aqui ou clique para selecionar</p>
@@ -91,7 +113,12 @@ export default function FileUpload({ onUploaded }) {
               <div className="progress-track">
                 <div className="progress-bar" style={{ width: `${status.pct}%` }} />
               </div>
-              <span>Enviando… {status.pct}%</span>
+              <div className="progress-row">
+                <span>Enviando… {status.pct}%</span>
+                <button type="button" className="cancel-btn" onClick={cancelUpload}>
+                  Cancelar
+                </button>
+              </div>
             </>
           )}
           {status.phase === 'processing' && (
@@ -99,12 +126,18 @@ export default function FileUpload({ onUploaded }) {
               <div className="progress-track">
                 <div className="progress-bar indeterminate" />
               </div>
-              <span>Processando e indexando…</span>
+              <div className="progress-row">
+                <span>Processando e indexando…</span>
+                <button type="button" className="cancel-btn" onClick={cancelUpload}>
+                  Cancelar
+                </button>
+              </div>
             </>
           )}
           {status.phase === 'done' && <span className="ok">✓ Indexado</span>}
         </div>
       )}
+      {note && <p className="muted">{note}</p>}
       {error && <p className="error">{error}</p>}
     </div>
   )
