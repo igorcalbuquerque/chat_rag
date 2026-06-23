@@ -75,7 +75,7 @@ def fake_redis():
 def fake_embeddings(monkeypatch):
     """Patch the embeddings factory everywhere it is used."""
     emb = FakeEmbeddings()
-    monkeypatch.setattr(ingestion, "get_embeddings", lambda: emb)
+    monkeypatch.setattr(ingestion, "get_embeddings", lambda api_key=None: emb)
     return emb
 
 
@@ -83,7 +83,7 @@ def fake_embeddings(monkeypatch):
 def fake_llm(monkeypatch):
     """Patch the LLM factory used inside the RAG graph."""
     llm = FakeLLM()
-    monkeypatch.setattr(rag_graph, "get_llm", lambda: llm)
+    monkeypatch.setattr(rag_graph, "get_llm", lambda api_key=None, provider=None: llm)
     return llm
 
 
@@ -98,7 +98,7 @@ def fake_retriever(monkeypatch):
             "score": 0.91,
         }
     ]
-    monkeypatch.setattr(rag_graph, "retrieve", lambda q, k=None: chunks)
+    monkeypatch.setattr(rag_graph, "retrieve", lambda q, k=None, api_key=None: chunks)
     return chunks
 
 

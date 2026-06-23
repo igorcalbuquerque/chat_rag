@@ -35,6 +35,8 @@ class RAGState(TypedDict, total=False):
     question: str
     session_id: str
     top_k: int
+    api_key: str | None  # per-request provider key override (BYOK)
+    llm_provider: str | None  # per-request LLM provider override
     history: list[dict]
     retrieved_chunks: list[dict]
     messages: list  # LangChain message objects sent to the LLM
@@ -45,7 +47,7 @@ class RAGState(TypedDict, total=False):
 # --- Nodes ---
 def retriever_node(state: RAGState) -> RAGState:
     """Semantic search in Redis to fetch the most relevant chunks."""
-    chunks = retrieve(state["question"], state.get("top_k"))
+    chunks = retrieve(state["question"], state.get("top_k"), state.get("api_key"))
     return {"retrieved_chunks": chunks}
 
 
@@ -78,7 +80,9 @@ def context_builder_node(state: RAGState) -> RAGState:
 
 def llm_node(state: RAGState) -> RAGState:
     """Call the configured chat model with the assembled prompt."""
-    response = get_llm().invoke(state["messages"])
+    response = get_llm(state.get("api_key"), state.get("llm_provider")).invoke(
+        state["messages"]
+    )
     answer = response.content if hasattr(response, "content") else str(response)
     return {"answer": answer}
 
@@ -116,13 +120,21 @@ def build_graph():
     return graph.compile()
 
 
-def run_rag(question: str, session_id: str, top_k: int | None = None) -> dict:
+def run_rag(
+    question: str,
+    session_id: str,
+    top_k: int | None = None,
+    api_key: str | None = None,
+    llm_provider: str | None = None,
+) -> dict:
     """Execute the full RAG graph and return ``answer`` + ``sources``."""
     settings = get_settings()
     state: RAGState = {
         "question": question,
         "session_id": session_id,
         "top_k": top_k or settings.top_k,
+        "api_key": api_key,
+        "llm_provider": llm_provider,
     }
     result = build_graph().invoke(state)
     return {
@@ -133,7 +145,11 @@ def run_rag(question: str, session_id: str, top_k: int | None = None) -> dict:
 
 
 def stream_rag(
-    question: str, session_id: str, top_k: int | None = None
+    question: str,
+    session_id: str,
+    top_k: int | None = None,
+    api_key: str | None = None,
+    llm_provider: str | None = None,
 ) -> tuple[Iterator[str], list[dict]]:
     """Run retrieval + context building, then stream LLM tokens.
 
@@ -147,13 +163,16 @@ def stream_rag(
         "question": question,
         "session_id": session_id,
         "top_k": top_k or settings.top_k,
+        "api_key": api_key,
+        "llm_provider": llm_provider,
     }
     state = {**base, **retriever_node(base)}
     state = {**state, **context_builder_node(state)}
     sources = response_formatter_node(state)["sources"]
 
     def token_iterator() -> Iterator[str]:
-        for piece in get_llm().stream(state["messages"]):
+        llm = get_llm(state.get("api_key"), state.get("llm_provider"))
+        for piece in llm.stream(state["messages"]):
             content = piece.content if hasattr(piece, "content") else str(piece)
             if content:
                 yield content

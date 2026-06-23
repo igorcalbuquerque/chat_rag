@@ -50,6 +50,35 @@ body {
   margin: 0 0 8px;
 }
 
+/* ---------------- API key ---------------- */
+.apikey {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.apikey input,
+.apikey select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+}
+.apikey input:focus,
+.apikey select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.apikey-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+.apikey small {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 /* ---------------- Upload ---------------- */
 .dropzone {
   border: 2px dashed var(--border);

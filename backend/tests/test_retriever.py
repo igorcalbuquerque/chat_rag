@@ -42,7 +42,7 @@ class _FakeEmbeddings:
 
 
 def test_retrieve_parses_and_scores(monkeypatch):
-    monkeypatch.setattr(retriever, "get_embeddings", lambda: _FakeEmbeddings())
+    monkeypatch.setattr(retriever, "get_embeddings", lambda api_key=None: _FakeEmbeddings())
     docs = [
         _FakeDoc("primeiro", "a.pdf", "2", "0.1"),
         _FakeDoc("segundo", "b.pdf", "0", "0.4"),
@@ -65,7 +65,7 @@ def test_retrieve_parses_and_scores(monkeypatch):
 
 
 def test_retrieve_defaults_top_k_from_settings(monkeypatch):
-    monkeypatch.setattr(retriever, "get_embeddings", lambda: _FakeEmbeddings())
+    monkeypatch.setattr(retriever, "get_embeddings", lambda api_key=None: _FakeEmbeddings())
     client = _FakeClient(_FakeResult([]))
     redis_client.set_redis(client)
 

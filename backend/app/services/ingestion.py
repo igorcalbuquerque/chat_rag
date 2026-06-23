@@ -113,9 +113,10 @@ def _to_float32_bytes(vector: list[float]) -> bytes:
     return np.asarray(vector, dtype=np.float32).tobytes()
 
 
-def ingest_file(filename: str, data: bytes) -> dict:
+def ingest_file(filename: str, data: bytes, api_key: str | None = None) -> dict:
     """Run the full ingestion pipeline for a single file.
 
+    ``api_key`` optionally overrides the embedding provider key per request.
     Returns a dict with ``file_id``, ``name``, ``chunks_indexed`` and
     ``status`` so the upload endpoint can serialize it directly.
     """
@@ -131,7 +132,7 @@ def ingest_file(filename: str, data: bytes) -> dict:
             "status": "empty",
         }
 
-    embeddings = get_embeddings().embed_documents(chunks)
+    embeddings = get_embeddings(api_key).embed_documents(chunks)
 
     file_id = str(uuid.uuid4())
     uploaded_at = datetime.now(timezone.utc).isoformat()

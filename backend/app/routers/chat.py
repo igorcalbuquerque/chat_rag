@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from typing import Iterator
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.config import SUPPORTED_LLM_PROVIDERS
 from app.models.schemas import ChatRequest, ChatResponse, Source
 from app.services.history import append_message
 from app.services.rag_graph import run_rag, stream_rag
@@ -15,10 +16,34 @@ from app.services.rag_graph import run_rag, stream_rag
 router = APIRouter()
 
 
+def _validate_provider(provider: str | None) -> str | None:
+    """Reject an unsupported per-request LLM provider with a clear 400."""
+    if provider and provider not in SUPPORTED_LLM_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported LLM provider '{provider}'. "
+                f"Supported: {', '.join(SUPPORTED_LLM_PROVIDERS)}."
+            ),
+        )
+    return provider
+
+
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest) -> ChatResponse:
-    """Answer a question using the full RAG pipeline (non-streaming)."""
-    result = run_rag(request.question, request.session_id, request.top_k)
+def chat(
+    request: ChatRequest,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_llm_provider: str | None = Header(default=None, alias="X-LLM-Provider"),
+) -> ChatResponse:
+    """Answer a question using the full RAG pipeline (non-streaming).
+
+    ``X-API-Key`` overrides the provider key and ``X-LLM-Provider`` overrides
+    the chat model provider, both per request and both optional.
+    """
+    provider = _validate_provider(x_llm_provider)
+    result = run_rag(
+        request.question, request.session_id, request.top_k, x_api_key, provider
+    )
 
     append_message(request.session_id, "user", request.question)
     append_message(request.session_id, "assistant", result["answer"])
@@ -31,13 +56,20 @@ def chat(request: ChatRequest) -> ChatResponse:
 
 
 @router.post("/chat/stream")
-def chat_stream(request: ChatRequest) -> StreamingResponse:
+def chat_stream(
+    request: ChatRequest,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    x_llm_provider: str | None = Header(default=None, alias="X-LLM-Provider"),
+) -> StreamingResponse:
     """Stream the answer token by token via Server-Sent Events.
 
     Emits ``token`` events while generating and a final ``done`` event with
     the sources and full answer.
     """
-    tokens, sources = stream_rag(request.question, request.session_id, request.top_k)
+    provider = _validate_provider(x_llm_provider)
+    tokens, sources = stream_rag(
+        request.question, request.session_id, request.top_k, x_api_key, provider
+    )
 
     def event_stream() -> Iterator[str]:
         collected: list[str] = []

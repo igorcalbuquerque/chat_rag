@@ -4,16 +4,35 @@ import axios from 'axios'
 
 const api = axios.create({ baseURL: '/api' })
 
+export const API_KEY_STORAGE = 'chat-rag-api-key'
+export const PROVIDER_STORAGE = 'chat-rag-llm-provider'
+
+// Optional bring-your-own-key + LLM provider: if the user saved them, send
+// per request. The server falls back to its .env config when absent.
+function authHeaders() {
+  const headers = {}
+  const key = localStorage.getItem(API_KEY_STORAGE)
+  const provider = localStorage.getItem(PROVIDER_STORAGE)
+  if (key) headers['X-API-Key'] = key
+  if (provider) headers['X-LLM-Provider'] = provider
+  return headers
+}
+
 export async function uploadFiles(files, onProgress, signal) {
   const form = new FormData()
   for (const file of files) form.append('files', file)
   const { data } = await api.post('/upload', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': 'multipart/form-data', ...authHeaders() },
     signal, // AbortSignal: lets the caller cancel an in-flight upload
     onUploadProgress: (e) => {
       if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100))
     },
   })
+  return data
+}
+
+export async function getConfig() {
+  const { data } = await api.get('/config')
   return data
 }
 
@@ -28,11 +47,11 @@ export async function deleteDocument(fileId) {
 }
 
 export async function sendChat({ question, sessionId, topK }) {
-  const { data } = await api.post('/chat', {
-    question,
-    session_id: sessionId,
-    top_k: topK,
-  })
+  const { data } = await api.post(
+    '/chat',
+    { question, session_id: sessionId, top_k: topK },
+    { headers: authHeaders() },
+  )
   return data
 }
 
@@ -42,7 +61,7 @@ export async function streamChat({ question, sessionId, topK }, { onToken, onDon
   try {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ question, session_id: sessionId, top_k: topK }),
     })
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)

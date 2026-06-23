@@ -12,7 +12,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.models.schemas import HealthResponse
+from app.config import KEY_PROVIDERS, SUPPORTED_LLM_PROVIDERS, get_settings
+from app.models.schemas import ConfigResponse, HealthResponse
 from app.routers import chat, documents, upload
 from app.services import redis_client
 
@@ -59,4 +60,21 @@ def health(response: Response) -> HealthResponse:
     return HealthResponse(
         status="ok" if connected else "error",
         redis="connected" if connected else "disconnected",
+    )
+
+
+@app.get("/config", response_model=ConfigResponse)
+def config_info() -> ConfigResponse:
+    """Report the configured providers so the UI can guide the API-key field."""
+    settings = get_settings()
+    key_providers: list[str] = []
+    for provider in (settings.llm_provider, settings.embedding_provider):
+        if provider in KEY_PROVIDERS and provider not in key_providers:
+            key_providers.append(provider)
+    return ConfigResponse(
+        llm_provider=settings.llm_provider,
+        embedding_provider=settings.embedding_provider,
+        supported_llm_providers=list(SUPPORTED_LLM_PROVIDERS),
+        key_providers=key_providers,
+        requires_api_key=bool(key_providers),
     )

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import ApiKeyInput from './components/ApiKeyInput'
 import ChatWindow from './components/ChatWindow'
 import DocumentList from './components/DocumentList'
 import FileUpload from './components/FileUpload'
@@ -90,6 +91,7 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <h1 className="brand">Chat com Documentos</h1>
+        <ApiKeyInput />
         <FileUpload onUploaded={refreshDocuments} />
         <section>
           <h3>Documentos</h3>

@@ -65,3 +65,15 @@ class ChatResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     redis: str
+
+
+# --- Config (which providers the server uses) ---
+class ConfigResponse(BaseModel):
+    llm_provider: str
+    embedding_provider: str
+    # LLM providers the visitor may pick from in the UI.
+    supported_llm_providers: list[str]
+    # Distinct providers that require an API key (so the UI can tell the user
+    # which key to paste). Empty when the server runs fully local (no key).
+    key_providers: list[str]
+    requires_api_key: bool

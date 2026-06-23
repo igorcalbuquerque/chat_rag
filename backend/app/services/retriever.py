@@ -16,21 +16,27 @@ def _decode(value: bytes | str | None) -> str:
     return value.decode("utf-8") if isinstance(value, bytes) else value
 
 
-def retrieve(question: str, top_k: int | None = None) -> list[dict]:
+def retrieve(
+    question: str, top_k: int | None = None, api_key: str | None = None
+) -> list[dict]:
     """Embed the question and return the ``top_k`` most similar chunks.
 
+    ``api_key`` optionally overrides the embedding provider key per request.
     Each result dict contains ``chunk``, ``source``, ``chunk_index`` and a
     cosine-similarity ``score`` in ``[0, 1]`` (1 = most similar).
     """
     settings = get_settings()
     k = top_k or settings.top_k
+    # EF_RUNTIME must be >= k; a higher value improves HNSW recall.
+    ef = max(settings.ef_runtime, k)
 
-    query_vector = get_embeddings().embed_query(question)
+    query_vector = get_embeddings(api_key).embed_query(question)
     query_bytes = np.asarray(query_vector, dtype=np.float32).tobytes()
 
-    # RediSearch KNN syntax: return the closest k vectors by cosine distance.
+    # RediSearch KNN: return the closest k vectors by cosine distance. EF_RUNTIME
+    # widens the HNSW search so the true nearest neighbours aren't missed.
     redis_query = (
-        Query(f"*=>[KNN {k} @embedding $vec AS score]")
+        Query(f"*=>[KNN {k} @embedding $vec EF_RUNTIME {ef} AS score]")
         .sort_by("score")
         .return_fields("content", "source", "chunk_index", "score")
         .dialect(2)

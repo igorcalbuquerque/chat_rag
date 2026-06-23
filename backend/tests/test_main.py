@@ -40,3 +40,37 @@ def test_health_503_when_redis_down(client, monkeypatch):
     response = client.get("/health")
     assert response.status_code == 503
     assert response.json() == {"status": "error", "redis": "disconnected"}
+
+
+def test_config_local_provider_needs_no_key(client):
+    # Defaults: ollama + sentence-transformers (no key required).
+    body = client.get("/config").json()
+    assert body["requires_api_key"] is False
+    assert body["key_providers"] == []
+    assert body["supported_llm_providers"] == [
+        "openai",
+        "anthropic",
+        "gemini",
+        "ollama",
+    ]
+
+
+def test_config_reports_key_provider(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    body = client.get("/config").json()
+    assert body["requires_api_key"] is True
+    assert body["key_providers"] == ["openai"]  # deduplicated
+
+
+def test_config_reports_multiple_key_providers(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    body = client.get("/config").json()
+    assert body["key_providers"] == ["anthropic", "openai"]

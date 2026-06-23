@@ -17,9 +17,16 @@ EMBEDDING_DIMENSIONS: dict[str, int] = {
     "text-embedding-ada-002": 1536,
     "all-MiniLM-L6-v2": 384,
     "all-mpnet-base-v2": 768,
+    "models/text-embedding-004": 768,
+    "text-embedding-004": 768,
 }
 
 DEFAULT_DIMENSION = 384
+
+# LLM providers the visitor can pick from in the frontend.
+SUPPORTED_LLM_PROVIDERS = ("openai", "anthropic", "gemini", "ollama")
+# Providers that authenticate with an API key (vs local Ollama / Sentence-T.).
+KEY_PROVIDERS = ("openai", "anthropic", "gemini")
 
 
 class Settings(BaseSettings):
@@ -30,10 +37,10 @@ class Settings(BaseSettings):
     )
 
     # --- Providers ---
-    llm_provider: Literal["openai", "anthropic", "ollama"] = "ollama"
-    embedding_provider: Literal["openai", "sentence-transformers"] = (
-        "sentence-transformers"
-    )
+    llm_provider: Literal["openai", "anthropic", "ollama", "gemini"] = "ollama"
+    embedding_provider: Literal[
+        "openai", "sentence-transformers", "gemini"
+    ] = "sentence-transformers"
 
     # --- Model names ---
     llm_model: str = "llama3"
@@ -42,6 +49,7 @@ class Settings(BaseSettings):
     # --- API keys / endpoints ---
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    google_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
 
     # --- Redis ---
@@ -53,6 +61,9 @@ class Settings(BaseSettings):
     chunk_size: int = 500
     chunk_overlap: int = 50
     top_k: int = 5
+    # HNSW search breadth at query time. Higher = better recall (finds the true
+    # nearest neighbours even in large/skewed indexes), at a small latency cost.
+    ef_runtime: int = 128
     history_size: int = 6  # past messages kept per session for context
 
     # --- Generation ---

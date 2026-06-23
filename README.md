@@ -18,8 +18,8 @@ on Redis + answer generation by an LLM, displaying the sources used.
 └──────────────┘      └──────────┬───────────┘      └──────────────────┘
                                   │
                                   ▼
-                        LLM (OpenAI / Anthropic / Ollama)
-                        Embeddings (OpenAI / Sentence-Transformers)
+                        LLM (OpenAI / Anthropic / Gemini / Ollama)
+                        Embeddings (OpenAI / Gemini / Sentence-Transformers)
 ```
 
 | Layer        | Technology                                   |
@@ -27,8 +27,8 @@ on Redis + answer generation by an LLM, displaying the sources used.
 | Frontend     | React 18 + Vite, served via Nginx            |
 | API          | Python 3.11, FastAPI, LangChain + LangGraph  |
 | Vector Store | Redis Stack (RediSearch, HNSW/COSINE index)  |
-| LLM          | OpenAI / Anthropic / Ollama (configurable)   |
-| Embeddings   | OpenAI / Sentence-Transformers (configurable)|
+| LLM          | OpenAI / Anthropic / Gemini / Ollama (configurable) |
+| Embeddings   | OpenAI / Gemini / Sentence-Transformers (config.)  |
 | Infra        | Docker Compose                               |
 
 ---
@@ -89,6 +89,15 @@ EMBEDDING_PROVIDER=sentence-transformers
 LLM_MODEL=claude-3-5-sonnet-latest
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 ANTHROPIC_API_KEY=sk-ant-... # your key here
+```
+
+**Google Gemini (has a free tier — LLM + embeddings):**
+```env
+LLM_PROVIDER=gemini
+EMBEDDING_PROVIDER=gemini
+LLM_MODEL=gemini-1.5-flash
+EMBEDDING_MODEL=models/text-embedding-004
+GOOGLE_API_KEY=...           # your key here
 ```
 </details>
 
@@ -164,16 +173,20 @@ docker compose down -v    # stop and DELETE the Redis volume (full reset)
 ## Using the application
 
 1. Open <http://localhost:3000>.
-2. **Upload**: drag a PDF, TXT or DOCX onto the upload area (or click to select).
-   Watch the ingestion progress bar.
-3. The document appears in the **Documents** list (with the number of indexed
+2. **Chat model (optional)**: in the sidebar, pick the LLM provider and paste its
+   API key. Skip this if the server already has a key in `.env`, or if you use a
+   local provider (Ollama) that needs no key.
+3. **Upload**: drag a PDF, TXT or DOCX onto the upload area (or click to select).
+   Watch the progress (upload → processing); you can **Cancel** an upload in
+   progress — handy for large files.
+4. The document appears in the **Documents** list (with the number of indexed
    chunks).
-4. **Ask** in the chat field and press **Enter**. The answer appears as a
+5. **Ask** in the chat field and press **Enter**. The answer appears as a
    **stream** (token by token).
-5. Click **Sources** below each answer to see the chunks used.
-6. **Multiple conversations**: create/rename/delete sessions in the sidebar
+6. Click **Sources** below each answer to see the chunks used.
+7. **Multiple conversations**: create/rename/delete sessions in the sidebar
    (double-click the name to rename).
-7. Remove a document with the **✕** in the list — the corresponding vectors are
+8. Remove a document with the **✕** in the list — the corresponding vectors are
    deleted from Redis.
 
 ---
@@ -217,7 +230,9 @@ curl -N -X POST http://localhost:8000/chat/stream \
 | `/health` returns `redis: "disconnected"`   | The `redis` service is still starting — wait for the healthcheck or check `docker compose logs redis`. |
 | Dimension error on upload/chat              | You changed the embeddings model without resetting the index. Run `docker compose down -v` and start again. |
 | Chat errors with `LLM_PROVIDER=ollama`      | Ollama is not running or the model wasn't pulled (`ollama pull llama3`). Check `OLLAMA_BASE_URL`. |
-| OpenAI/Anthropic authentication error       | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` missing or invalid in `.env`.                      |
+| Provider authentication error (500)         | The API key (in `.env` or the sidebar field) is missing/invalid for the selected provider. |
+| "No text extracted" on a PDF                | The PDF is scanned/image-only — enable OCR (`INSTALL_OCR=true`, see below) and rebuild.    |
+| Upload returns 413 (too large)              | File exceeds the Nginx limit (`client_max_body_size`, default 300M in `frontend/nginx.conf`). |
 | Port 3000/8000/6379 already in use          | Stop the conflicting process or adjust the port mapping in `docker-compose.yml`.          |
 
 Useful logs:
@@ -232,21 +247,40 @@ docker compose logs -f           # all services
 
 | Variable             | Description                                        | Default                |
 |----------------------|----------------------------------------------------|------------------------|
-| `LLM_PROVIDER`       | `openai` / `anthropic` / `ollama`                  | `ollama`               |
-| `EMBEDDING_PROVIDER` | `openai` / `sentence-transformers`                 | `sentence-transformers`|
+| `LLM_PROVIDER`       | `openai` / `anthropic` / `gemini` / `ollama`       | `ollama`               |
+| `EMBEDDING_PROVIDER` | `openai` / `gemini` / `sentence-transformers`      | `sentence-transformers`|
 | `LLM_MODEL`          | chat model name                                    | `llama3`               |
 | `EMBEDDING_MODEL`    | embeddings model name                              | `all-MiniLM-L6-v2`     |
 | `OPENAI_API_KEY`     | OpenAI key (if applicable)                         | —                      |
 | `ANTHROPIC_API_KEY`  | Anthropic key (if applicable)                      | —                      |
+| `GOOGLE_API_KEY`     | Google Gemini key (if applicable)                  | —                      |
 | `OLLAMA_BASE_URL`    | Ollama endpoint                                    | `http://host.docker.internal:11434` |
 | `REDIS_URL`          | Redis URL (auto in compose)                        | `redis://localhost:6379` |
 | `CHUNK_SIZE`         | chunk size (tokens)                                | `500`                  |
 | `CHUNK_OVERLAP`      | overlap between chunks                             | `50`                   |
 | `TOP_K`              | number of chunks retrieved per question            | `5`                    |
+| `EF_RUNTIME`         | HNSW search breadth (higher = better recall)       | `128`                  |
 | `HISTORY_SIZE`       | number of messages kept per session                | `6`                    |
+| `INSTALL_LOCAL_EMBEDDINGS` | build flag: install Sentence-Transformers + torch | `false`           |
 | `INSTALL_OCR`        | build flag: install OCR stack for scanned PDFs      | `false`                |
 | `OCR_LANGUAGE`       | Tesseract languages (`+`-separated)                | `por+eng`              |
 | `OCR_DPI`            | render DPI used for OCR                             | `200`                  |
+
+### Chat provider + API key (bring-your-own-key)
+
+The frontend sidebar lets each visitor **pick the chat LLM provider** (from the
+server's `supported_llm_providers`, see `/config`) and **paste that provider's
+key**. They are sent per request as `X-LLM-Provider` and `X-API-Key`, overriding
+the server config for that request only (the key is stored just in the browser).
+
+Keys can also come from the **server `.env`** (`OPENAI_API_KEY` /
+`ANTHROPIC_API_KEY` / `GOOGLE_API_KEY`), which is the fallback when no header is
+sent — convenient for local runs. This makes a public deploy possible **without
+shipping any key**: each visitor brings their own.
+
+> **Embeddings stay fixed on the server** (provider + model). Only the **chat
+> LLM** is per-request, because the Redis vector index dimension is set by the
+> embedding model and must stay consistent across all documents and queries.
 
 ### Scanned PDFs (OCR)
 
@@ -278,6 +312,7 @@ every page), so expect long processing times on big scanned files.
 | POST   | `/chat`               | Question + RAG answer with sources         |
 | POST   | `/chat/stream`        | Same as `/chat`, with SSE streaming        |
 | GET    | `/health`             | Health check (status + Redis connectivity) |
+| GET    | `/config`             | Configured providers + whether an API key is required |
 
 Example `POST /chat`:
 ```json
@@ -339,20 +374,27 @@ The pytest configuration (including `--cov` and the 95% threshold) lives in
 Structure:
 ```
 backend/tests/
-├── conftest.py            # fixtures: redis mock, llm mock, embeddings mock, TestClient
-├── test_ingestion.py      # chunking, embeddings, Redis indexing
-├── test_api_upload.py     # POST /upload
-├── test_api_chat.py       # POST /chat and /chat/stream (RAG pipeline)
-└── test_api_documents.py  # GET and DELETE /documents
+├── conftest.py                   # fixtures: redis/llm/embeddings mocks, TestClient
+├── test_ingestion.py             # chunking, PDF/TXT/DOCX extraction, OCR fallback
+├── test_api_upload.py            # POST /upload
+├── test_api_chat.py              # POST /chat and /chat/stream (RAG, BYOK headers)
+├── test_api_documents.py         # GET and DELETE /documents
+├── test_factories.py             # LLM/embedding provider factories (all providers)
+├── test_redis_client.py          # connection, ping, index creation
+├── test_retriever.py             # KNN result parsing
+├── test_main.py                  # lifespan, /health, /config
+├── test_misc.py                  # config, history, small edge cases
+└── test_retriever_integration.py # real Redis Stack (opt-in, `-m integration`)
 ```
 
 ---
 
 ## Architecture decisions and trade-offs
 
-- **Configurable provider (OpenAI/Anthropic/Ollama):** factories in `llm.py` and
-  `embeddings.py` decouple the rest of the code from the vendor. Lets you run
-  100% local and free (Ollama) or with paid APIs, by switching one env var.
+- **Configurable provider (OpenAI/Anthropic/Gemini/Ollama):** factories in
+  `llm.py` and `embeddings.py` decouple the rest of the code from the vendor.
+  Lets you run 100% local and free (Ollama) or with paid/free APIs, by switching
+  one env var — and the visitor can override the chat LLM per request (BYOK).
 - **LangGraph instead of a simple chain:** more control and extensibility of the
   RAG flow (future validation/retry/branching nodes).
 - **HNSW + COSINE index:** good balance between speed and quality for semantic
@@ -393,3 +435,6 @@ chat_rag/
 - ✅ **DOCX support** (in addition to the required PDF/TXT).
 - ✅ **OCR for scanned PDFs** (opt-in build, Tesseract).
 - ✅ **Document removal** with cleanup of the corresponding vectors in Redis.
+- ✅ **Bring-your-own-key + per-request LLM provider** chosen in the UI.
+- ✅ **Google Gemini** provider (LLM + embeddings), incl. a free-tier path.
+- ✅ **Cancelable uploads** and 100% backend test coverage.

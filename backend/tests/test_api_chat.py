@@ -39,6 +39,53 @@ def test_run_rag_builds_context_from_history(
     assert result["sources"][0]["source"] == "relatorio_q3.pdf"
 
 
+def test_chat_forwards_api_key_header(client, monkeypatch):
+    from app.routers import chat as chat_router
+
+    captured = {}
+
+    def fake_run_rag(question, session_id, top_k=None, api_key=None, llm_provider=None):
+        captured["api_key"] = api_key
+        return {"answer": "ok", "sources": [], "session_id": session_id}
+
+    monkeypatch.setattr(chat_router, "run_rag", fake_run_rag)
+    response = client.post(
+        "/chat",
+        json={"question": "oi", "session_id": "s"},
+        headers={"X-API-Key": "sk-byok"},
+    )
+    assert response.status_code == 200
+    assert captured["api_key"] == "sk-byok"
+
+
+def test_chat_forwards_llm_provider_header(client, monkeypatch):
+    from app.routers import chat as chat_router
+
+    captured = {}
+
+    def fake_run_rag(question, session_id, top_k=None, api_key=None, llm_provider=None):
+        captured["provider"] = llm_provider
+        return {"answer": "ok", "sources": [], "session_id": session_id}
+
+    monkeypatch.setattr(chat_router, "run_rag", fake_run_rag)
+    response = client.post(
+        "/chat",
+        json={"question": "oi", "session_id": "s"},
+        headers={"X-LLM-Provider": "gemini"},
+    )
+    assert response.status_code == 200
+    assert captured["provider"] == "gemini"
+
+
+def test_chat_rejects_unsupported_provider(client):
+    response = client.post(
+        "/chat",
+        json={"question": "oi", "session_id": "s"},
+        headers={"X-LLM-Provider": "bogus"},
+    )
+    assert response.status_code == 400
+
+
 def test_chat_stream_emits_sse(client, fake_retriever, fake_llm):
     response = client.post(
         "/chat/stream",

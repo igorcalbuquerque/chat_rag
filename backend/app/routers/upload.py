@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Header, HTTPException, UploadFile
 
 from app.models.schemas import IngestedFile, UploadResponse
 from app.services.documents import delete_document
@@ -16,8 +16,14 @@ router = APIRouter()
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload(files: list[UploadFile] = File(...)) -> UploadResponse:
-    """Receive file(s) and trigger the ingestion pipeline for each."""
+async def upload(
+    files: list[UploadFile] = File(...),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+) -> UploadResponse:
+    """Receive file(s) and trigger the ingestion pipeline for each.
+
+    ``X-API-Key`` (optional) overrides the server's embedding provider key.
+    """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
 
@@ -25,7 +31,7 @@ async def upload(files: list[UploadFile] = File(...)) -> UploadResponse:
     for upload_file in files:
         data = await upload_file.read()
         try:
-            result = ingest_file(upload_file.filename or "unknown", data)
+            result = ingest_file(upload_file.filename or "unknown", data, x_api_key)
         except UnsupportedFileType as exc:
             raise HTTPException(status_code=415, detail=str(exc)) from exc
         except TextExtractionError as exc:
