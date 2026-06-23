@@ -1,9 +1,12 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=60"
+# Integration tests are excluded from the default run; opt in with
+# `pytest -m integration` (which overrides this -m). They are destructive
+# against a real Redis and must only run on an isolated/dedicated instance.
+addopts = "-q -m 'not integration' --cov=app --cov-report=term-missing --cov-fail-under=60"
 markers = [
-    "integration: tests that require a real Redis Stack (skipped if unavailable)",
+    "integration: tests that require a real, isolated Redis Stack",
 ]
 
 [tool.coverage.run]

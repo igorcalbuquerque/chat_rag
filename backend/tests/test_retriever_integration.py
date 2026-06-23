@@ -4,9 +4,15 @@ Unlike the unit tests (which mock ``retrieve``), this exercises the full
 ``ensure_index`` -> ``ingest_file`` -> ``retrieve`` -> ``delete_document``
 flow against a **real Redis Stack** (RediSearch module required for KNN).
 
-It self-skips when no Redis Stack is reachable, so the default unit suite and
-the standard CI job stay fast and green. A dedicated CI job runs it with a
-``redis/redis-stack`` service.
+Safety / isolation:
+- Marked ``integration`` and excluded from the default suite (see
+  ``pyproject.toml``), so a plain ``pytest`` never runs it.
+- Uses a dedicated **test index and key prefix**, so even when pointed at a
+  shared Redis it never touches the application's ``docs`` index or ``doc:``
+  keys. The destructive ``dropindex`` only ever targets the test index.
+- Locally it self-skips when no Redis Stack is reachable. In the dedicated CI
+  job (``REQUIRE_INTEGRATION=1``) it waits for Redis and **fails loudly**
+  instead of skipping, so the job can't go green without actually testing.
 
 Embeddings are deterministic and produced locally (no torch, no paid API):
 each vector has exactly ``settings.embedding_dimension`` dimensions, so it
@@ -16,6 +22,8 @@ always matches the index dimension.
 from __future__ import annotations
 
 import hashlib
+import os
+import time
 
 import pytest
 import redis
@@ -24,6 +32,14 @@ from app.config import get_settings
 from app.services import documents, ingestion, redis_client, retriever
 
 pytestmark = pytest.mark.integration
+
+# Dedicated namespace so the test never collides with real app data.
+_TEST_INDEX = "test_docs"
+_TEST_PREFIX = "test:doc:"
+
+# In the dedicated CI job this is set so missing Redis/RediSearch fails the
+# build instead of silently skipping.
+REQUIRE_INTEGRATION = os.environ.get("REQUIRE_INTEGRATION") == "1"
 
 
 class IntegrationEmbeddings:
@@ -42,34 +58,69 @@ class IntegrationEmbeddings:
         return self._vec(text)
 
 
+def _unavailable(message: str) -> None:
+    """Fail when integration is required, otherwise skip."""
+    if REQUIRE_INTEGRATION:
+        pytest.fail(message)
+    pytest.skip(message)
+
+
+def _wait_for_redis(client: redis.Redis, attempts: int = 30, delay: float = 1.0):
+    """Poll Redis until it answers PING; return True or the last error."""
+    last_exc: Exception | None = None
+    for _ in range(attempts):
+        try:
+            client.ping()
+            return True
+        except redis.exceptions.RedisError as exc:
+            last_exc = exc
+            time.sleep(delay)
+    return last_exc
+
+
 @pytest.fixture(scope="module", autouse=True)
 def real_redis():
-    """Connect to a real Redis Stack or skip the whole module."""
-    settings = get_settings()
-    # Use the app's own connection factory so the test exercises the same
-    # client configuration (RESP2, etc.) as production code.
-    client = redis_client.get_redis()
-    try:
-        client.ping()
-    except redis.exceptions.RedisError as exc:
-        pytest.skip(f"Redis Stack not available: {exc}")
+    """Provision an isolated test index on a real Redis Stack."""
+    # Point the app at a test-only index/prefix for the duration of the module.
+    previous = {
+        "REDIS_INDEX_NAME": os.environ.get("REDIS_INDEX_NAME"),
+        "REDIS_KEY_PREFIX": os.environ.get("REDIS_KEY_PREFIX"),
+    }
+    os.environ["REDIS_INDEX_NAME"] = _TEST_INDEX
+    os.environ["REDIS_KEY_PREFIX"] = _TEST_PREFIX
+    get_settings.cache_clear()
+    redis_client.set_redis(None)  # rebuild the client against test settings
 
-    # Drop any pre-existing index so the dimension matches this test's
-    # embeddings, then (re)create it. Requires the RediSearch module.
+    client = redis_client.get_redis()
+    ready = _wait_for_redis(client)
+    if ready is not True:
+        _unavailable(f"Redis Stack not reachable: {ready}")
+
+    # Fresh test index (drops ONLY the test index, never the app's).
     try:
-        client.ft(settings.redis_index_name).dropindex(delete_documents=True)
+        client.ft(_TEST_INDEX).dropindex(delete_documents=True)
     except redis.exceptions.ResponseError:
         pass  # index did not exist
     try:
         redis_client.ensure_index()
     except redis.exceptions.RedisError as exc:
-        pytest.skip(f"RediSearch module not available: {exc}")
+        _unavailable(f"RediSearch module not available: {exc}")
 
     yield client
 
-    # Clean up any keys created by this module.
-    for key in client.scan_iter(match=f"{settings.redis_key_prefix}*"):
+    # Cleanup: remove test keys + index, then restore env and client.
+    for key in client.scan_iter(match=f"{_TEST_PREFIX}*"):
         client.delete(key)
+    try:
+        client.ft(_TEST_INDEX).dropindex(delete_documents=True)
+    except redis.exceptions.ResponseError:
+        pass
+    for name, value in previous.items():
+        if value is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = value
+    get_settings.cache_clear()
     redis_client.set_redis(None)
 
 
