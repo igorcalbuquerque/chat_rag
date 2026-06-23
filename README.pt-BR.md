@@ -296,8 +296,8 @@ tokens do LLM via SSE.
 ## Testes
 
 Suíte com `pytest`, mocando Redis (`fakeredis`), embeddings e LLM — **sem
-chamadas reais a APIs**. Cobertura atual: **~83%** do backend (mínimo exigido: 60%;
-o `pytest` falha automaticamente se a cobertura cair abaixo disso).
+chamadas reais a APIs**. Cobertura atual: **100%** do backend (o `pytest` falha
+automaticamente se a cobertura cair abaixo do limite de 95%).
 
 **Opção 1 — via Docker (sem instalar Python):**
 ```bash
@@ -312,7 +312,7 @@ pip install -r requirements.txt
 pytest                 # ou: make test-local (a partir da raiz)
 ```
 
-A configuração do pytest (incluindo `--cov` e o limite de 60%) está em
+A configuração do pytest (incluindo `--cov` e o limite de 95%) está em
 `backend/pyproject.toml`.
 
 Estrutura:

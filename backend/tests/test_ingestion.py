@@ -38,6 +38,20 @@ def test_extract_text_unsupported():
         ingestion._extract_text("image.png", b"\x00\x01")
 
 
+def test_extract_text_pdf():
+    import io
+
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+
+    text = ingestion._extract_text("doc.pdf", buffer.getvalue())
+    assert isinstance(text, str)
+
+
 def test_ingest_file_indexes_chunks(fake_redis, fake_embeddings):
     data = ("frase de teste. " * 200).encode("utf-8")
     result = ingestion.ingest_file("doc.txt", data)

@@ -22,7 +22,7 @@ from redis.commands.search.field import (
 )
 try:  # redis-py >= 6 renamed this module to snake_case
     from redis.commands.search.index_definition import IndexDefinition, IndexType
-except ImportError:  # redis-py < 6
+except ImportError:  # pragma: no cover - redis-py < 6 fallback
     from redis.commands.search.indexDefinition import IndexDefinition, IndexType
 
 from app.config import get_settings

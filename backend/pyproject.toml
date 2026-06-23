@@ -4,7 +4,7 @@ testpaths = ["tests"]
 # Integration tests are excluded from the default run; opt in with
 # `pytest -m integration` (which overrides this -m). They are destructive
 # against a real Redis and must only run on an isolated/dedicated instance.
-addopts = "-q -m 'not integration' --cov=app --cov-report=term-missing --cov-fail-under=60"
+addopts = "-q -m 'not integration' --cov=app --cov-report=term-missing --cov-fail-under=95"
 markers = [
     "integration: tests that require a real, isolated Redis Stack",
 ]
