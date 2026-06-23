@@ -1,0 +1,62 @@
+# Render Blueprint (Infrastructure as Code) para o chat_rag.
+#
+# Define dois serviços no free tier:
+#   - chat-rag-api : backend FastAPI (Python, native build)
+#   - chat-rag-web : frontend React buildado, servido como static site
+#
+# O Redis NAO entra aqui: usamos o Redis Cloud (free 30MB, com modulo Search/RediSearch),
+# que e externo. A connection string entra como a env var REDIS_URL (segredo).
+#
+# Variaveis marcadas com `sync: false` sao preenchidas no painel do Render:
+#   - REDIS_URL          -> segredo (rediss://default:<senha>@<host>:<porta>)
+#   - VITE_API_BASE_URL  -> so existe depois do 1o deploy do backend
+#
+# IA via BYOK: nenhuma chave de provider fica no servidor. O avaliador cola a
+# propria chave OpenAI no campo da UI (header X-API-Key), usada tanto para os
+# embeddings quanto para o LLM.
+
+services:
+  # ---------------------------------------------------------------- Backend
+  - type: web
+    name: chat-rag-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      # Casa com o Dockerfile e com os pins (numpy 1.26.4 etc. tem wheels p/ 3.11).
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: LLM_PROVIDER
+        value: openai
+      - key: EMBEDDING_PROVIDER
+        value: openai
+      - key: LLM_MODEL
+        value: gpt-4o-mini
+      # Define a dimensao do indice (1536). NAO mudar depois de indexar documentos.
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      # Redis Cloud (TLS). Preencher no painel.
+      - key: REDIS_URL
+        sync: false
+      # OPENAI_API_KEY propositalmente ausente -> BYOK (a chave vem da UI).
+
+  # --------------------------------------------------------------- Frontend
+  - type: web
+    name: chat-rag-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # URL raiz do backend (sem /api). Ex.: https://chat-rag-api.onrender.com
+      # Preencher no painel apos o deploy do backend.
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      # SPA fallback: toda rota desconhecida serve o index.html (client-side routing).
+      - type: rewrite
+        source: /*
+        destination: /index.html

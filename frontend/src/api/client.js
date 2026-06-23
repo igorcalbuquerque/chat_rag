@@ -1,8 +1,12 @@
-// Thin API client. All requests go to the same-origin "/api" prefix, which
-// Nginx (prod) or the Vite dev proxy forwards to the FastAPI backend.
+// Thin API client. By default requests go to the same-origin "/api" prefix,
+// which Nginx (prod) or the Vite dev proxy forwards to the FastAPI backend.
+// In a split deploy (e.g. Render static site + separate backend) set
+// VITE_API_BASE_URL to the backend root URL (no "/api"); CORS is open server-side.
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
+const api = axios.create({ baseURL: API_BASE })
 
 export const API_KEY_STORAGE = 'chat-rag-api-key'
 export const PROVIDER_STORAGE = 'chat-rag-llm-provider'
@@ -59,7 +63,7 @@ export async function sendChat({ question, sessionId, topK }) {
 // is a POST. Invokes onToken for each token and onDone with the final payload.
 export async function streamChat({ question, sessionId, topK }, { onToken, onDone, onError }) {
   try {
-    const response = await fetch('/api/chat/stream', {
+    const response = await fetch(`${API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ question, session_id: sessionId, top_k: topK }),
