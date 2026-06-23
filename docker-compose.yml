@@ -19,6 +19,8 @@ services:
         # Set INSTALL_LOCAL_EMBEDDINGS=true in .env for the 100% local path
         # (installs sentence-transformers + torch). Default is the slim image.
         INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-false}
+        # Set INSTALL_OCR=true in .env to OCR scanned PDFs (Tesseract + PyMuPDF).
+        INSTALL_OCR: ${INSTALL_OCR:-false}
     ports:
       - "8000:8000"
     env_file:

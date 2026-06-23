@@ -1,0 +1,11 @@
+# Optional extras for OCR of scanned PDFs (no text layer).
+# Requires the Tesseract binary too (installed via the Dockerfile when
+# INSTALL_OCR=true). Only needed for image-only / scanned documents.
+#
+# Install with:  pip install -r requirements-ocr.txt
+# Or build the image with:  INSTALL_OCR=true
+-r requirements.txt
+
+pymupdf==1.25.1
+pytesseract==0.3.13
+Pillow==11.1.0

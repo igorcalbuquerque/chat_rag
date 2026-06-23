@@ -2,7 +2,7 @@
 
 **🌐 Idioma:** [English](README.md) · **Português (BR)**
 
-Aplicação full-stack que permite fazer **upload de documentos** (PDF/TXT) e
+Aplicação full-stack que permite fazer **upload de documentos** (PDF/TXT/DOCX) e
 **conversar com eles** usando RAG (Retrieval-Augmented Generation): busca
 semântica vetorial em Redis + geração de resposta por um LLM, com exibição das
 fontes utilizadas.
@@ -165,7 +165,7 @@ docker compose down -v    # para e APAGA o volume do Redis (reset total)
 ## Usando a aplicação
 
 1. Acesse <http://localhost:3000>.
-2. **Upload**: arraste um PDF ou TXT para a área de upload (ou clique para
+2. **Upload**: arraste um PDF, TXT ou DOCX para a área de upload (ou clique para
    selecionar). Acompanhe a barra de progresso da ingestão.
 3. O documento aparece na lista **Documentos** (com o nº de chunks indexados).
 4. **Pergunte** no campo de chat e pressione **Enter**. A resposta aparece em
@@ -244,6 +244,27 @@ docker compose logs -f           # todos os serviços
 | `CHUNK_OVERLAP`      | sobreposição entre chunks                          | `50`                   |
 | `TOP_K`              | nº de chunks recuperados por pergunta              | `5`                    |
 | `HISTORY_SIZE`       | nº de mensagens mantidas por sessão                | `6`                    |
+| `INSTALL_OCR`        | flag de build: instala o OCR p/ PDFs escaneados    | `false`                |
+| `OCR_LANGUAGE`       | idiomas do Tesseract (separados por `+`)           | `por+eng`              |
+| `OCR_DPI`            | DPI de renderização usado no OCR                   | `200`                  |
+
+### PDFs escaneados (OCR)
+
+PDFs **com camada de texto** e TXT funcionam direto. **PDFs escaneados (só
+imagem)** não têm texto extraível, então a ingestão precisa de OCR. O OCR é um
+extra de build opcional (mantém a imagem padrão pequena):
+
+```env
+# .env
+INSTALL_OCR=true
+```
+```bash
+docker compose up --build   # reconstrói a imagem da API com Tesseract + PyMuPDF
+```
+
+Sem isso, subir um PDF escaneado retorna um erro claro em vez de indexar um
+documento vazio. Atenção: o OCR é **lento** para documentos grandes (renderiza e
+lê cada página), então espere tempos de processamento altos em arquivos extensos.
 
 ---
 
@@ -369,4 +390,6 @@ chat_rag/
 - ✅ **Múltiplas sessões de chat** com nomes customizáveis no frontend.
 - ✅ **CI com GitHub Actions** (testes + build a cada push).
 - ✅ **Suporte a múltiplos arquivos** no upload.
+- ✅ **Suporte a DOCX** (além dos PDF/TXT obrigatórios).
+- ✅ **OCR para PDFs escaneados** (build opcional, Tesseract).
 - ✅ **Remoção de documentos** com limpeza dos vetores no Redis.

@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 import numpy as np
+from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
@@ -23,12 +24,71 @@ class UnsupportedFileType(ValueError):
     """Raised when an uploaded file has an unsupported extension."""
 
 
+class TextExtractionError(ValueError):
+    """Raised when no text could be extracted from a document."""
+
+
+def _extract_pdf_text(data: bytes) -> str:
+    """Extract the embedded text layer from a PDF (empty for scanned PDFs)."""
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def _extract_docx_text(data: bytes) -> str:
+    """Extract text from a DOCX file, including paragraphs and table cells."""
+    document = DocxDocument(io.BytesIO(data))
+    parts = [p.text for p in document.paragraphs]
+    for table in document.tables:
+        for row in table.rows:
+            parts.extend(cell.text for cell in row.cells)
+    return "\n".join(parts)
+
+
+def _ocr_available() -> bool:
+    """True if the optional OCR stack (PyMuPDF + pytesseract) is installed."""
+    try:
+        import fitz  # noqa: F401
+        import pytesseract  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _ocr_pdf(data: bytes) -> str:  # pragma: no cover - requires native OCR stack
+    """Render each PDF page to an image and OCR it with Tesseract."""
+    import fitz
+    import pytesseract
+    from PIL import Image
+
+    settings = get_settings()
+    document = fitz.open(stream=data, filetype="pdf")
+    pages: list[str] = []
+    for page in document:
+        pixmap = page.get_pixmap(dpi=settings.ocr_dpi)
+        image = Image.open(io.BytesIO(pixmap.tobytes("png")))
+        pages.append(pytesseract.image_to_string(image, lang=settings.ocr_language))
+    return "\n".join(pages)
+
+
 def _extract_text(filename: str, data: bytes) -> str:
-    """Extract raw text from a PDF or TXT payload."""
+    """Extract raw text from a PDF or TXT payload.
+
+    For PDFs without a text layer (e.g. scanned documents) it falls back to OCR
+    when the optional OCR stack is installed; otherwise it raises a clear error.
+    """
     lower = filename.lower()
     if lower.endswith(".pdf"):
-        reader = PdfReader(io.BytesIO(data))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+        text = _extract_pdf_text(data)
+        if text.strip():
+            return text
+        if _ocr_available():
+            return _ocr_pdf(data)
+        raise TextExtractionError(
+            "Não foi possível extrair texto do PDF (provavelmente escaneado). "
+            "Habilite o OCR reconstruindo a imagem com INSTALL_OCR=true."
+        )
+    if lower.endswith(".docx"):
+        return _extract_docx_text(data)
     if lower.endswith(".txt"):
         return data.decode("utf-8", errors="ignore")
     raise UnsupportedFileType(f"Unsupported file type: {filename}")

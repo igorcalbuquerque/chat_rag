@@ -2,7 +2,7 @@
 
 **🌐 Language:** **English** · [Português (BR)](README.pt-BR.md)
 
-Full-stack application that lets you **upload documents** (PDF/TXT) and **chat
+Full-stack application that lets you **upload documents** (PDF/TXT/DOCX) and **chat
 with them** using RAG (Retrieval-Augmented Generation): semantic vector search
 on Redis + answer generation by an LLM, displaying the sources used.
 
@@ -164,7 +164,7 @@ docker compose down -v    # stop and DELETE the Redis volume (full reset)
 ## Using the application
 
 1. Open <http://localhost:3000>.
-2. **Upload**: drag a PDF or TXT onto the upload area (or click to select).
+2. **Upload**: drag a PDF, TXT or DOCX onto the upload area (or click to select).
    Watch the ingestion progress bar.
 3. The document appears in the **Documents** list (with the number of indexed
    chunks).
@@ -244,6 +244,27 @@ docker compose logs -f           # all services
 | `CHUNK_OVERLAP`      | overlap between chunks                             | `50`                   |
 | `TOP_K`              | number of chunks retrieved per question            | `5`                    |
 | `HISTORY_SIZE`       | number of messages kept per session                | `6`                    |
+| `INSTALL_OCR`        | build flag: install OCR stack for scanned PDFs      | `false`                |
+| `OCR_LANGUAGE`       | Tesseract languages (`+`-separated)                | `por+eng`              |
+| `OCR_DPI`            | render DPI used for OCR                             | `200`                  |
+
+### Scanned PDFs (OCR)
+
+PDFs **with a text layer** and TXT work out of the box. **Scanned / image-only
+PDFs** have no extractable text, so ingestion needs OCR. OCR is an opt-in build
+extra (keeps the default image small):
+
+```env
+# .env
+INSTALL_OCR=true
+```
+```bash
+docker compose up --build   # rebuilds the API image with Tesseract + PyMuPDF
+```
+
+Without it, uploading a scanned PDF returns a clear error instead of indexing an
+empty document. Note: OCR is **slow** for large documents (it renders and reads
+every page), so expect long processing times on big scanned files.
 
 ---
 
@@ -369,4 +390,6 @@ chat_rag/
 - ✅ **Multiple chat sessions** with custom names on the frontend.
 - ✅ **CI with GitHub Actions** (tests + build on every push).
 - ✅ **Multi-file support** on upload.
+- ✅ **DOCX support** (in addition to the required PDF/TXT).
+- ✅ **OCR for scanned PDFs** (opt-in build, Tesseract).
 - ✅ **Document removal** with cleanup of the corresponding vectors in Redis.

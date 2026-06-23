@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     max_tokens: int = 1024
 
+    # --- OCR (optional, for scanned PDFs) ---
+    ocr_language: str = "por+eng"
+    ocr_dpi: int = 200
+
     @property
     def embedding_dimension(self) -> int:
         """Vector dimension for the configured embedding model."""

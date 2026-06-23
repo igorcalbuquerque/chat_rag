@@ -6,7 +6,11 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.models.schemas import IngestedFile, UploadResponse
 from app.services.documents import delete_document
-from app.services.ingestion import UnsupportedFileType, ingest_file
+from app.services.ingestion import (
+    TextExtractionError,
+    UnsupportedFileType,
+    ingest_file,
+)
 
 router = APIRouter()
 
@@ -24,6 +28,8 @@ async def upload(files: list[UploadFile] = File(...)) -> UploadResponse:
             result = ingest_file(upload_file.filename or "unknown", data)
         except UnsupportedFileType as exc:
             raise HTTPException(status_code=415, detail=str(exc)) from exc
+        except TextExtractionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         ingested.append(IngestedFile(**result))
 
     first = ingested[0]

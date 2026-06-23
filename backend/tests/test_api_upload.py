@@ -30,3 +30,21 @@ def test_upload_unsupported_type(client, fake_embeddings):
     files = {"files": ("image.png", b"\x89PNG", "image/png")}
     response = client.post("/upload", files=files)
     assert response.status_code == 415
+
+
+def test_upload_scanned_pdf_without_ocr_returns_422(client, fake_embeddings, monkeypatch):
+    import io
+
+    from pypdf import PdfWriter
+
+    from app.services import ingestion
+
+    monkeypatch.setattr(ingestion, "_ocr_available", lambda: False)
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+
+    files = {"files": ("scan.pdf", buffer.getvalue(), "application/pdf")}
+    response = client.post("/upload", files=files)
+    assert response.status_code == 422
