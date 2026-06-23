@@ -257,6 +257,11 @@ body {
 .source-chunk {
   margin: 2px 0 0;
   font-size: 12px;
+  line-height: 1.4;
+  /* Override the pre-wrap inherited from .bubble: raw chunk text (esp. from
+     PDFs) carries newlines that would otherwise render one word per line. */
+  white-space: normal;
+  overflow-wrap: anywhere;
   background: #fff;
   padding: 6px 8px;
   border-radius: 6px;
