@@ -42,9 +42,7 @@ class RAGState(TypedDict, total=False):
     sources: list[dict]
 
 
-# --------------------------------------------------------------------------
-# Nodes
-# --------------------------------------------------------------------------
+# --- Nodes ---
 def retriever_node(state: RAGState) -> RAGState:
     """Semantic search in Redis to fetch the most relevant chunks."""
     chunks = retrieve(state["question"], state.get("top_k"))
@@ -99,9 +97,7 @@ def response_formatter_node(state: RAGState) -> RAGState:
     return {"sources": sources}
 
 
-# --------------------------------------------------------------------------
-# Graph assembly
-# --------------------------------------------------------------------------
+# --- Graph assembly ---
 @lru_cache
 def build_graph():
     """Compile and cache the RAG state graph."""

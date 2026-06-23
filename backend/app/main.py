@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.schemas import HealthResponse
@@ -47,10 +47,16 @@ app.include_router(chat.router, tags=["chat"])
 
 
 @app.get("/health", response_model=HealthResponse)
-def health() -> HealthResponse:
-    """Liveness probe reporting Redis connectivity."""
+def health(response: Response) -> HealthResponse:
+    """Liveness probe reporting Redis connectivity.
+
+    Returns HTTP 503 when Redis is unreachable so the Docker Compose
+    healthcheck marks the API as unhealthy instead of falsely "ok".
+    """
     connected = redis_client.ping()
+    if not connected:
+        response.status_code = 503
     return HealthResponse(
-        status="ok",
+        status="ok" if connected else "error",
         redis="connected" if connected else "disconnected",
     )

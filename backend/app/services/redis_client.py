@@ -39,7 +39,12 @@ def get_redis() -> redis.Redis:
     global _client
     if _client is None:
         settings = get_settings()
-        _client = redis.Redis.from_url(settings.redis_url, decode_responses=False)
+        # Force RESP2 (protocol=2): the RediSearch ``search()`` helper does not
+        # parse RESP3 results correctly in newer redis-py versions, which makes
+        # KNN queries silently return nothing.
+        _client = redis.Redis.from_url(
+            settings.redis_url, decode_responses=False, protocol=2
+        )
     return _client
 
 

@@ -18,9 +18,7 @@ from app import config
 from app.services import documents, history, ingestion, rag_graph, redis_client
 
 
-# --------------------------------------------------------------------------
-# Fakes
-# --------------------------------------------------------------------------
+# --- Fakes ---
 class FakeEmbeddings:
     """Deterministic embeddings: hash-based vectors of fixed dimension."""
 
@@ -54,9 +52,7 @@ class FakeLLM:
             yield _FakeChunk(word + " ")
 
 
-# --------------------------------------------------------------------------
-# Fixtures
-# --------------------------------------------------------------------------
+# --- Fixtures ---
 @pytest.fixture(autouse=True)
 def reset_settings():
     """Ensure each test gets fresh, default settings."""

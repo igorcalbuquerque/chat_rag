@@ -14,8 +14,10 @@ export default function ChatWindow({ session, onMessages }) {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight)
   }, [messages])
 
+  // Forward the updater straight through to App, pinning the session id so
+  // streaming writes always land in the right conversation.
   function setMessages(updater) {
-    onMessages(typeof updater === 'function' ? updater(messages) : updater)
+    onMessages(session.id, updater)
   }
 
   async function handleSend() {

@@ -28,7 +28,15 @@ def get_embeddings() -> Embeddings:
         )
 
     if settings.embedding_provider == "sentence-transformers":
-        from langchain_huggingface import HuggingFaceEmbeddings
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+        except ImportError as exc:  # optional heavy dependency
+            raise ImportError(
+                "EMBEDDING_PROVIDER=sentence-transformers requires the optional "
+                "local embedding stack. Install it with "
+                "`pip install -r requirements-local.txt` or rebuild the image "
+                "with INSTALL_LOCAL_EMBEDDINGS=true."
+            ) from exc
 
         return HuggingFaceEmbeddings(model_name=settings.embedding_model)
 

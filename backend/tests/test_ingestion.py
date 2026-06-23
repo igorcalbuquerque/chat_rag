@@ -9,15 +9,19 @@ from app.services import ingestion
 
 
 def test_chunk_text_respects_size_and_overlap(monkeypatch):
+    import tiktoken
+
     monkeypatch.setenv("CHUNK_SIZE", "50")
     monkeypatch.setenv("CHUNK_OVERLAP", "10")
     get_settings.cache_clear()
 
-    text = "palavra " * 100
+    text = "palavra " * 200
     chunks = ingestion.chunk_text(text)
 
+    # Chunking is token-based: each chunk must stay within the token budget.
+    enc = tiktoken.get_encoding("cl100k_base")
     assert len(chunks) > 1
-    assert all(len(c) <= 60 for c in chunks)  # size + tolerance
+    assert all(len(enc.encode(c)) <= 50 for c in chunks)
 
 
 def test_chunk_text_skips_empty():

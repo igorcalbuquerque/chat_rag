@@ -13,7 +13,12 @@ services:
       retries: 5
 
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # Set INSTALL_LOCAL_EMBEDDINGS=true in .env for the 100% local path
+        # (installs sentence-transformers + torch). Default is the slim image.
+        INSTALL_LOCAL_EMBEDDINGS: ${INSTALL_LOCAL_EMBEDDINGS:-false}
     ports:
       - "8000:8000"
     env_file:

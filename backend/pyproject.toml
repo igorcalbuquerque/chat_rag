@@ -2,6 +2,9 @@
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=60"
+markers = [
+    "integration: tests that require a real Redis Stack (skipped if unavailable)",
+]
 
 [tool.coverage.run]
 omit = ["tests/*"]

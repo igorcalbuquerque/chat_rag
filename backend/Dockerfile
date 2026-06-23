@@ -6,13 +6,23 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# System deps occasionally needed by sentence-transformers / numpy wheels.
+# Set to "true" to also install the heavy local embedding stack
+# (sentence-transformers + torch) for the 100% local path. Default slim image
+# targets API providers (OpenAI / Anthropic / Ollama LLM).
+ARG INSTALL_LOCAL_EMBEDDINGS=false
+
+# build-essential is only needed for the optional local extras' wheels.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements.txt requirements-local.txt ./
+RUN pip install --upgrade pip && \
+    if [ "$INSTALL_LOCAL_EMBEDDINGS" = "true" ]; then \
+        pip install -r requirements-local.txt; \
+    else \
+        pip install -r requirements.txt; \
+    fi
 
 COPY app ./app
 

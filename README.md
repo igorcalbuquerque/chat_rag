@@ -93,7 +93,7 @@ ANTHROPIC_API_KEY=sk-ant-... # your key here
 </details>
 
 <details>
-<summary><b>Path B — 100% local and free (Ollama) — this is the `.env.example` default</b></summary>
+<summary><b>Path B — 100% local and free (Ollama)</b></summary>
 
 Uses no paid API. The **embeddings** run inside the container
 (Sentence-Transformers, downloaded automatically on first use). The **LLM**
@@ -107,15 +107,23 @@ ollama pull llama3
 ollama serve   # if not already active
 ```
 
-`.env` (already the default in `.env.example`):
+`.env`:
 ```env
 LLM_PROVIDER=ollama
 EMBEDDING_PROVIDER=sentence-transformers
 LLM_MODEL=llama3
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 OLLAMA_BASE_URL=http://host.docker.internal:11434
+# Required for local embeddings: installs sentence-transformers + torch.
+# This makes the API image significantly larger and slower to build.
+INSTALL_LOCAL_EMBEDDINGS=true
 ```
 
+> The default image is **slim** and ships only the API-provider stack. Local
+> embeddings (Sentence-Transformers + torch) are an opt-in build extra enabled
+> by `INSTALL_LOCAL_EMBEDDINGS=true`, so the heavy dependency is only installed
+> when you actually need it.
+>
 > The `docker-compose.yml` already maps `host.docker.internal` to the host on
 > Linux, so the `api` container can reach the Ollama running on your machine.
 </details>
@@ -232,7 +240,7 @@ docker compose logs -f           # all services
 | `ANTHROPIC_API_KEY`  | Anthropic key (if applicable)                      | —                      |
 | `OLLAMA_BASE_URL`    | Ollama endpoint                                    | `http://host.docker.internal:11434` |
 | `REDIS_URL`          | Redis URL (auto in compose)                        | `redis://localhost:6379` |
-| `CHUNK_SIZE`         | chunk size (characters)                            | `500`                  |
+| `CHUNK_SIZE`         | chunk size (tokens)                                | `500`                  |
 | `CHUNK_OVERLAP`      | overlap between chunks                             | `50`                   |
 | `TOP_K`              | number of chunks retrieved per question            | `5`                    |
 | `HISTORY_SIZE`       | number of messages kept per session                | `6`                    |

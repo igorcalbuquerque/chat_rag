@@ -29,33 +29,33 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    # ----- Providers -----------------------------------------------------
+    # --- Providers ---
     llm_provider: Literal["openai", "anthropic", "ollama"] = "ollama"
     embedding_provider: Literal["openai", "sentence-transformers"] = (
         "sentence-transformers"
     )
 
-    # ----- Model names ---------------------------------------------------
+    # --- Model names ---
     llm_model: str = "llama3"
     embedding_model: str = "all-MiniLM-L6-v2"
 
-    # ----- API keys / endpoints -----------------------------------------
+    # --- API keys / endpoints ---
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
 
-    # ----- Redis ---------------------------------------------------------
+    # --- Redis ---
     redis_url: str = "redis://localhost:6379"
     redis_index_name: str = "docs"
     redis_key_prefix: str = "doc:"
 
-    # ----- RAG / chunking ------------------------------------------------
+    # --- RAG / chunking ---
     chunk_size: int = 500
     chunk_overlap: int = 50
     top_k: int = 5
-    history_size: int = 6  # number of past messages kept per session
+    history_size: int = 6  # past messages kept per session for context
 
-    # ----- Generation ----------------------------------------------------
+    # --- Generation ---
     llm_temperature: float = 0.0
     max_tokens: int = 1024
 

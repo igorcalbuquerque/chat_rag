@@ -1,0 +1,10 @@
+# Optional extras for the 100% local, zero-cost embedding path.
+# Pulls in PyTorch (~several GB). Only needed when
+# EMBEDDING_PROVIDER=sentence-transformers.
+#
+# Install with:  pip install -r requirements-local.txt
+# Or build the image with:  INSTALL_LOCAL_EMBEDDINGS=true
+-r requirements.txt
+
+sentence-transformers==3.3.1
+langchain-huggingface==0.1.2

@@ -3,9 +3,7 @@
 from pydantic import BaseModel, Field
 
 
-# --------------------------------------------------------------------------
-# Upload / ingestion
-# --------------------------------------------------------------------------
+# --- Upload / ingestion ---
 class IngestedFile(BaseModel):
     """Result of ingesting a single uploaded file."""
 
@@ -25,9 +23,7 @@ class UploadResponse(BaseModel):
     status: str = "ok"
 
 
-# --------------------------------------------------------------------------
-# Documents listing / deletion
-# --------------------------------------------------------------------------
+# --- Documents: listing / deletion ---
 class DocumentInfo(BaseModel):
     """Metadata describing an indexed document."""
 
@@ -41,15 +37,13 @@ class DeleteResponse(BaseModel):
     deleted: bool
 
 
-# --------------------------------------------------------------------------
-# Chat / RAG
-# --------------------------------------------------------------------------
+# --- Chat / RAG ---
 class ChatRequest(BaseModel):
     """Payload for ``POST /chat``."""
 
     question: str = Field(..., min_length=1)
     session_id: str = "default"
-    top_k: int | None = None
+    top_k: int | None = Field(default=None, ge=1, le=20)
 
 
 class Source(BaseModel):
@@ -67,9 +61,7 @@ class ChatResponse(BaseModel):
     session_id: str
 
 
-# --------------------------------------------------------------------------
-# Health
-# --------------------------------------------------------------------------
+# --- Health ---
 class HealthResponse(BaseModel):
     status: str
     redis: str

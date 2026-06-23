@@ -6,6 +6,7 @@ pydantic-settings==2.7.1
 redis==5.2.1
 numpy==1.26.4
 pypdf==5.1.0
+tiktoken==0.8.0
 
 # LangChain / LangGraph orchestration
 langchain==0.3.14
@@ -15,11 +16,12 @@ langchain-text-splitters==0.3.4
 langchain-openai==0.2.14
 langchain-anthropic==0.3.1
 langchain-ollama==0.2.2
-langchain-huggingface==0.1.2
 langgraph==0.2.62
 
-# Embeddings (open-source option)
-sentence-transformers==3.3.1
+# Local open-source embeddings (sentence-transformers + torch) are OPTIONAL and
+# heavy (~several GB). They are NOT installed in the default slim image. To use
+# EMBEDDING_PROVIDER=sentence-transformers, install requirements-local.txt
+# (or build with INSTALL_LOCAL_EMBEDDINGS=true).
 
 # Tests
 pytest==8.3.4

@@ -94,7 +94,7 @@ ANTHROPIC_API_KEY=sk-ant-... # sua chave aqui
 </details>
 
 <details>
-<summary><b>Caminho B — 100% local e sem custo (Ollama) — é o default do `.env.example`</b></summary>
+<summary><b>Caminho B — 100% local e sem custo (Ollama)</b></summary>
 
 Não usa nenhuma API paga. As **embeddings** rodam dentro do container
 (Sentence-Transformers, baixadas automaticamente no primeiro uso). O **LLM**
@@ -108,15 +108,23 @@ ollama pull llama3
 ollama serve   # se ainda não estiver ativo
 ```
 
-`.env` (já é o padrão do `.env.example`):
+`.env`:
 ```env
 LLM_PROVIDER=ollama
 EMBEDDING_PROVIDER=sentence-transformers
 LLM_MODEL=llama3
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 OLLAMA_BASE_URL=http://host.docker.internal:11434
+# Obrigatório para embeddings locais: instala sentence-transformers + torch.
+# Isso deixa a imagem da API bem maior e mais lenta para buildar.
+INSTALL_LOCAL_EMBEDDINGS=true
 ```
 
+> A imagem padrão é **slim** e traz só a stack de provedores via API. As
+> embeddings locais (Sentence-Transformers + torch) são um extra de build,
+> habilitado por `INSTALL_LOCAL_EMBEDDINGS=true`, então a dependência pesada só
+> é instalada quando realmente necessária.
+>
 > O `docker-compose.yml` já mapeia `host.docker.internal` para o host no Linux,
 > então o container `api` enxerga o Ollama da sua máquina.
 </details>
@@ -232,7 +240,7 @@ docker compose logs -f           # todos os serviços
 | `ANTHROPIC_API_KEY`  | chave Anthropic (se aplicável)                     | —                      |
 | `OLLAMA_BASE_URL`    | endpoint do Ollama                                 | `http://host.docker.internal:11434` |
 | `REDIS_URL`          | URL do Redis (auto em compose)                     | `redis://localhost:6379` |
-| `CHUNK_SIZE`         | tamanho do chunk (caracteres)                      | `500`                  |
+| `CHUNK_SIZE`         | tamanho do chunk (tokens)                          | `500`                  |
 | `CHUNK_OVERLAP`      | sobreposição entre chunks                          | `50`                   |
 | `TOP_K`              | nº de chunks recuperados por pergunta              | `5`                    |
 | `HISTORY_SIZE`       | nº de mensagens mantidas por sessão                | `6`                    |

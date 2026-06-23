@@ -35,12 +35,15 @@ def _extract_text(filename: str, data: bytes) -> str:
 
 
 def chunk_text(text: str) -> list[str]:
-    """Split text into overlapping chunks using the configured sizes."""
+    """Split text into overlapping chunks sized by tokens.
+
+    ``CHUNK_SIZE``/``CHUNK_OVERLAP`` are measured in tokens (tiktoken) rather
+    than characters, matching how embedding/LLM context budgets are counted.
+    """
     settings = get_settings()
-    splitter = RecursiveCharacterTextSplitter(
+    splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
-        length_function=len,
     )
     return [c for c in splitter.split_text(text) if c.strip()]
 

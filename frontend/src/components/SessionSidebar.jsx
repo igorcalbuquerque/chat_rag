@@ -1,4 +1,4 @@
-// Multiple chat sessions with custom names (differential feature).
+// Sidebar listing chat sessions, with create / rename / delete actions.
 export default function SessionSidebar({
   sessions,
   activeId,

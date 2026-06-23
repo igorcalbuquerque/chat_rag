@@ -46,9 +46,19 @@ export default function App() {
 
   const active = sessions.find((s) => s.id === activeId) || sessions[0]
 
-  function updateMessages(messages) {
+  // Accepts a functional updater applied against the latest session messages
+  // inside setSessions, so rapid streaming updates never use a stale snapshot.
+  function updateMessages(sessionId, updater) {
     setSessions((prev) =>
-      prev.map((s) => (s.id === active.id ? { ...s, messages } : s)),
+      prev.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              messages:
+                typeof updater === 'function' ? updater(s.messages) : updater,
+            }
+          : s,
+      ),
     )
   }
 
