@@ -1,0 +1,29 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pydantic-settings==2.7.1
+redis==5.2.1
+numpy==1.26.4
+pypdf==5.1.0
+
+# LangChain / LangGraph orchestration
+langchain==0.3.14
+langchain-core==0.3.29
+langchain-community==0.3.14
+langchain-text-splitters==0.3.4
+langchain-openai==0.2.14
+langchain-anthropic==0.3.1
+langchain-ollama==0.2.2
+langchain-huggingface==0.1.2
+langgraph==0.2.62
+
+# Embeddings (open-source option)
+sentence-transformers==3.3.1
+
+# Tests
+pytest==8.3.4
+pytest-cov==6.0.0
+pytest-asyncio==0.25.1
+httpx==0.28.1
+fakeredis==2.26.2
