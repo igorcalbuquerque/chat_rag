@@ -88,6 +88,12 @@ jobs:
     needs: [backend-tests, integration-tests, frontend-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    # Map the deploy-hook secrets to env so the steps can be skipped cleanly
+    # when they are not configured (otherwise curl gets an empty URL and fails).
+    # If your Render services have auto-deploy on, you can leave these unset.
+    env:
+      HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+      HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
     steps:
       - uses: actions/checkout@v4
 
@@ -104,9 +110,9 @@ jobs:
               - 'frontend/**'
 
       - name: Trigger Render deploy — backend (chat-rag-api)
-        if: steps.changes.outputs.backend == 'true'
-        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+        if: steps.changes.outputs.backend == 'true' && env.HOOK_API != ''
+        run: curl -fsS "$HOOK_API"
 
       - name: Trigger Render deploy — frontend (chat-rag-web)
-        if: steps.changes.outputs.frontend == 'true'
-        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_WEB }}"
+        if: steps.changes.outputs.frontend == 'true' && env.HOOK_WEB != ''
+        run: curl -fsS "$HOOK_WEB"
