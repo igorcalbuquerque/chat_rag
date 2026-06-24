@@ -101,4 +101,32 @@ describe('streamChat', () => {
     await streamChat({ question: 'hi', sessionId: 's1' }, { onError })
     expect(onError).toHaveBeenCalledOnce()
   })
+
+  it('routes a server error event to onError (no done)', async () => {
+    const sse =
+      'event: token\ndata: {"token":"par"}\n\n' +
+      'event: error\ndata: {"error":"LLM provider failed"}\n\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(sse)))
+
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    await streamChat({ question: 'hi', sessionId: 's1' }, { onDone, onError })
+
+    expect(onDone).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledOnce()
+    expect((onError.mock.calls[0][0] as Error).message).toContain('LLM provider failed')
+  })
+
+  it('calls onError when the stream ends without a done event (never hangs)', async () => {
+    // Tokens arrive but the connection drops before "done" — must not hang.
+    const sse = 'event: token\ndata: {"token":"He"}\n\n'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(sse)))
+
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    await streamChat({ question: 'hi', sessionId: 's1' }, { onDone, onError })
+
+    expect(onDone).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledOnce()
+  })
 })

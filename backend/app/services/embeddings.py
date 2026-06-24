@@ -34,9 +34,14 @@ def get_embeddings(api_key: str | None = None) -> Embeddings:
     if settings.embedding_provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 
+        # OpenAI caps a single embeddings request at 300k tokens. Our chunks are
+        # ~chunk_size tokens each, so cap how many we send per request to stay
+        # safely under that limit; otherwise large documents fail with a 400.
+        batch = max(1, 250_000 // max(settings.chunk_size, 1))
         return OpenAIEmbeddings(
             model=settings.embedding_model,
             api_key=api_key or settings.openai_api_key,
+            chunk_size=batch,
         )
 
     if settings.embedding_provider == "gemini":

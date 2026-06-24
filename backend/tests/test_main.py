@@ -2,9 +2,35 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
+from app import config
+from app.main import _validate_startup_config
 from app.services import redis_client
+
+
+def test_startup_fails_on_default_secret_when_auth_enabled(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    # SESSION_SECRET left at the insecure default.
+    config.get_settings.cache_clear()
+    with pytest.raises(RuntimeError, match="SESSION_SECRET"):
+        _validate_startup_config()
+
+
+def test_startup_ok_with_strong_secret_when_auth_enabled(monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("SESSION_SECRET", "a-strong-random-secret-value")
+    config.get_settings.cache_clear()
+    _validate_startup_config()  # must not raise
+
+
+def test_startup_warns_on_unknown_embedding_model(monkeypatch, caplog):
+    monkeypatch.setenv("EMBEDDING_MODEL", "totally-made-up-model")
+    config.get_settings.cache_clear()
+    with caplog.at_level("WARNING"):
+        _validate_startup_config()
+    assert any("no known dimension" in r.getMessage() for r in caplog.records)
 
 
 def test_lifespan_creates_index_on_startup(monkeypatch, fake_redis):

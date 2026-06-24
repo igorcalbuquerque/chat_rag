@@ -28,6 +28,10 @@ SUPPORTED_LLM_PROVIDERS = ("openai", "anthropic", "gemini", "ollama")
 # Providers that authenticate with an API key (vs local Ollama / Sentence-T.).
 KEY_PROVIDERS = ("openai", "anthropic", "gemini")
 
+# Default (insecure) signing secret. Safe for local dev only; the app refuses
+# to start with this value once authentication is enabled (see main.lifespan).
+DEFAULT_SESSION_SECRET = "dev-insecure-secret-change-me"
+
 # OAuth login providers offered when AUTH_ENABLED is on.
 AUTH_PROVIDERS = ("google", "github")
 # user_id used when auth is disabled (local dev): everything is scoped to it,
@@ -62,6 +66,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     redis_index_name: str = "docs"
     redis_key_prefix: str = "doc:"
+
+    # --- Upload limits (DoS / cost guardrails) ---
+    # Per-file ceiling. Kept in sync with the Nginx ``client_max_body_size``
+    # (300M) so the backend never rejects a file the proxy already accepted.
+    max_upload_mb: int = 300
+    max_files_per_request: int = 50  # files accepted in a single /upload call
 
     # --- RAG / chunking ---
     chunk_size: int = 500
@@ -103,9 +113,23 @@ class Settings(BaseSettings):
     token_ttl_seconds: int = 60 * 60 * 8
 
     @property
+    def max_upload_bytes(self) -> int:
+        """Per-file upload ceiling in bytes."""
+        return self.max_upload_mb * 1024 * 1024
+
+    @property
     def embedding_dimension(self) -> int:
         """Vector dimension for the configured embedding model."""
         return EMBEDDING_DIMENSIONS.get(self.embedding_model, DEFAULT_DIMENSION)
+
+    @property
+    def embedding_model_is_known(self) -> bool:
+        """Whether the configured embedding model has a known vector dimension.
+
+        When False the Redis index is sized with ``DEFAULT_DIMENSION``, which may
+        not match the model's real output — the app warns about this at startup.
+        """
+        return self.embedding_model in EMBEDDING_DIMENSIONS
 
 
 @lru_cache

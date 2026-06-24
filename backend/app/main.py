@@ -15,6 +15,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import (
     AUTH_PROVIDERS,
+    DEFAULT_SESSION_SECRET,
     KEY_PROVIDERS,
     SUPPORTED_LLM_PROVIDERS,
     get_settings,
@@ -27,9 +28,31 @@ logger = logging.getLogger("chat_rag")
 logging.basicConfig(level=logging.INFO)
 
 
+def _validate_startup_config() -> None:
+    """Fail fast on dangerous misconfiguration; warn on risky-but-valid ones."""
+    settings = get_settings()
+    # A weak signing secret with auth on lets anyone forge login tokens.
+    if settings.auth_enabled and settings.session_secret == DEFAULT_SESSION_SECRET:
+        raise RuntimeError(
+            "SESSION_SECRET is still the insecure default while AUTH_ENABLED=true. "
+            "Set SESSION_SECRET to a strong random value before starting in "
+            "production (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(32))'`)."
+        )
+    # An unknown embedding model means the index is sized with DEFAULT_DIMENSION,
+    # which may not match the model's real output and break KNN retrieval.
+    if not settings.embedding_model_is_known:
+        logger.warning(
+            "Embedding model %r has no known dimension; the Redis index is sized "
+            "with the default %d. Verify it matches the model's real output.",
+            settings.embedding_model,
+            settings.embedding_dimension,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create the Redis vector index on startup (best-effort)."""
+    """Validate config and create the Redis vector index on startup."""
+    _validate_startup_config()
     try:
         redis_client.ensure_index()
         logger.info("Redis vector index is ready.")

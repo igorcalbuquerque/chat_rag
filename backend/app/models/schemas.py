@@ -52,7 +52,7 @@ class Source(BaseModel):
     chunk: str
     source: str
     score: float
-    chunk_index: int | None = None
+    chunk_index: int = 0
 
 
 class ChatResponse(BaseModel):

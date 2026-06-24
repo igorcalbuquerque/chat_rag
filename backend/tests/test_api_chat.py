@@ -99,3 +99,24 @@ def test_chat_stream_emits_sse(client, fake_retriever, fake_llm):
     text = response.text
     assert "event: token" in text
     assert "event: done" in text
+
+
+def test_chat_stream_emits_error_event_on_llm_failure(client, monkeypatch):
+    from app.routers import chat as chat_router
+
+    def boom():
+        raise RuntimeError("provider exploded")
+        yield  # pragma: no cover - makes this a generator
+
+    monkeypatch.setattr(
+        chat_router,
+        "stream_rag",
+        lambda *a, **k: (boom(), []),
+    )
+    response = client.post(
+        "/chat/stream",
+        json={"question": "oi", "session_id": "boom"},
+    )
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "provider exploded" in response.text

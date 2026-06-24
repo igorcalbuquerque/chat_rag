@@ -7,9 +7,12 @@ pipeline can include short-term context in the prompt.
 from __future__ import annotations
 
 import json
+import logging
 
 from app.config import PUBLIC_USER_ID, get_settings
 from app.services.redis_client import get_redis
+
+logger = logging.getLogger("chat_rag")
 
 _HISTORY_PREFIX = "session:"
 
@@ -30,6 +33,7 @@ def get_history(session_id: str, user_id: str = PUBLIC_USER_ID) -> list[dict]:
         try:
             messages.append(json.loads(text))
         except (ValueError, TypeError):
+            logger.warning("Dropping corrupted history entry in %s", _key(session_id, user_id))
             continue
     return messages
 
@@ -41,6 +45,9 @@ def append_message(
     settings = get_settings()
     client = get_redis()
     key = _key(session_id, user_id)
-    client.rpush(key, json.dumps({"role": role, "content": content}))
-    # Keep only the last ``history_size`` messages.
-    client.ltrim(key, -settings.history_size, -1)
+    # Append + trim in a single pipeline so the list can't grow unbounded if the
+    # process dies between the two commands.
+    pipe = client.pipeline()
+    pipe.rpush(key, json.dumps({"role": role, "content": content}))
+    pipe.ltrim(key, -settings.history_size, -1)
+    pipe.execute()

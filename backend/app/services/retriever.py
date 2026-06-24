@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 from redis.commands.search.query import Query
 
 from app.config import PUBLIC_USER_ID, get_settings
 from app.services.embeddings import get_embeddings
 from app.services.redis_client import get_redis
+
+# User ids are sanitized at login, but the retrieval query interpolates the id
+# into a RediSearch TAG filter, so we re-sanitize here as defense-in-depth: no
+# crafted id can ever break out of the ``@user_id:{...}`` filter.
+_SAFE_USER_ID_RE = re.compile(r"[^a-zA-Z0-9_]")
 
 
 def _decode(value: bytes | str | None) -> str:
@@ -38,11 +45,13 @@ def retrieve(
     query_vector = get_embeddings(api_key).embed_query(question)
     query_bytes = np.asarray(query_vector, dtype=np.float32).tobytes()
 
+    safe_user_id = _SAFE_USER_ID_RE.sub("_", user_id)
+
     # Hybrid query: pre-filter by owner (TAG) then KNN over the survivors.
-    # ``user_id`` is sanitized at login to alnum/underscore, so no escaping is
-    # needed. EF_RUNTIME widens the HNSW search so true neighbours aren't missed.
+    # ``safe_user_id`` is re-sanitized above, so it can't break out of the TAG
+    # filter. EF_RUNTIME widens the HNSW search so true neighbours aren't missed.
     redis_query = (
-        Query(f"(@user_id:{{{user_id}}})=>[KNN {k} @embedding $vec EF_RUNTIME {ef} AS score]")
+        Query(f"(@user_id:{{{safe_user_id}}})=>[KNN {k} @embedding $vec EF_RUNTIME {ef} AS score]")
         .sort_by("score")
         .return_fields("content", "source", "chunk_index", "score")
         .dialect(2)
@@ -57,12 +66,15 @@ def retrieve(
     for doc in result.docs:
         # RediSearch returns cosine *distance*; similarity = 1 - distance.
         distance = float(_decode(getattr(doc, "score", "1")) or 1.0)
+        # Clamp to [0, 1] so a distance outside the expected range never yields a
+        # nonsensical (e.g. negative) similarity score.
+        similarity = max(0.0, min(1.0, 1.0 - distance))
         chunks.append(
             {
                 "chunk": _decode(getattr(doc, "content", "")),
                 "source": _decode(getattr(doc, "source", "")),
                 "chunk_index": int(_decode(getattr(doc, "chunk_index", "0")) or 0),
-                "score": round(1.0 - distance, 4),
+                "score": round(similarity, 4),
             }
         )
     return chunks

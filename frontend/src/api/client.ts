@@ -149,6 +149,7 @@ export async function streamChat(
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let finished = false // saw a terminal event (done or error)
 
     for (;;) {
       const { value, done } = await reader.read()
@@ -163,10 +164,22 @@ export async function streamChat(
         if (!dataMatch) continue
         const payload = JSON.parse(dataMatch[1])
         const eventType = eventMatch ? eventMatch[1] : 'message'
-        if (eventType === 'token') onToken?.(payload.token)
-        else if (eventType === 'done') onDone?.(payload as ChatResponse)
+        if (eventType === 'token') {
+          onToken?.(payload.token)
+        } else if (eventType === 'done') {
+          finished = true
+          onDone?.(payload as ChatResponse)
+        } else if (eventType === 'error') {
+          // Server reported a generation failure (e.g. the LLM call failed).
+          finished = true
+          onError?.(new Error(payload.error || 'stream error'))
+        }
       }
     }
+
+    // The stream closed without a terminal event: surface it as an error so the
+    // caller can stop showing a "thinking" state instead of hanging forever.
+    if (!finished) onError?.(new Error('Stream ended without completing.'))
   } catch (err) {
     onError?.(err)
   }

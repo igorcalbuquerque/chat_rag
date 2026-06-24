@@ -89,16 +89,29 @@ def chat_stream(
 
     def event_stream() -> Iterator[str]:
         collected: list[str] = []
-        for token in tokens:
-            collected.append(token)
-            yield f"event: token\ndata: {json.dumps({'token': token})}\n\n"
+        error: str | None = None
+        try:
+            for token in tokens:
+                collected.append(token)
+                yield f"event: token\ndata: {json.dumps({'token': token})}\n\n"
+        except Exception as exc:  # LLM failed mid-stream
+            error = str(exc)
+        finally:
+            # Persist whatever was generated. Runs on normal completion, on an
+            # LLM error, and on client disconnect (GeneratorExit), so a partial
+            # answer is never silently lost. No yield here: the generator may
+            # already be closing.
+            answer = "".join(collected)
+            if answer:
+                append_message(request.session_id, "user", request.question, user_id)
+                append_message(request.session_id, "assistant", answer, user_id)
 
-        answer = "".join(collected)
-        append_message(request.session_id, "user", request.question, user_id)
-        append_message(request.session_id, "assistant", answer, user_id)
+        if error is not None:
+            yield f"event: error\ndata: {json.dumps({'error': error})}\n\n"
+            return
 
         payload = {
-            "answer": answer,
+            "answer": "".join(collected),
             "sources": sources,
             "session_id": request.session_id,
         }

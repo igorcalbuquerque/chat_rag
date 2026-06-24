@@ -100,7 +100,7 @@ def response_formatter_node(state: RAGState) -> RAGState:
             "chunk": c["chunk"],
             "source": c["source"],
             "score": c["score"],
-            "chunk_index": c.get("chunk_index"),
+            "chunk_index": c.get("chunk_index", 0),
         }
         for c in state.get("retrieved_chunks", [])
     ]

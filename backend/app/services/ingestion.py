@@ -28,6 +28,10 @@ class TextExtractionError(ValueError):
     """Raised when no text could be extracted from a document."""
 
 
+class EmbeddingError(RuntimeError):
+    """Raised when the embedding provider returns malformed vectors."""
+
+
 def _extract_pdf_text(data: bytes) -> str:
     """Extract the embedded text layer from a PDF (empty for scanned PDFs)."""
     reader = PdfReader(io.BytesIO(data))
@@ -113,50 +117,81 @@ def _to_float32_bytes(vector: list[float]) -> bytes:
     return np.asarray(vector, dtype=np.float32).tobytes()
 
 
-def ingest_file(
+def _validate_embeddings(vectors: list[list[float]]) -> None:
+    """Reject empty or ragged embedding output before indexing.
+
+    A provider returning vectors of inconsistent length (or empty vectors)
+    would corrupt the index and make KNN search fail silently, so we surface it
+    as a clear error instead.
+    """
+    if not vectors or not vectors[0]:
+        raise EmbeddingError("Embedding provider returned no vectors.")
+    dim = len(vectors[0])
+    if any(len(v) != dim for v in vectors):
+        raise EmbeddingError("Embedding provider returned vectors of varying length.")
+
+
+def prepare_file(
     filename: str,
     data: bytes,
     api_key: str | None = None,
-    user_id: str = PUBLIC_USER_ID,
 ) -> dict:
-    """Run the full ingestion pipeline for a single file.
+    """Extract, chunk and embed a file **without** writing to Redis.
 
-    ``api_key`` optionally overrides the embedding provider key per request.
-    ``user_id`` tags every chunk so the document is only visible to its owner
-    (``PUBLIC_USER_ID`` when auth is disabled). Returns a dict with ``file_id``,
-    ``name``, ``chunks_indexed`` and ``status`` so the upload endpoint can
-    serialize it directly.
+    Returns a dict consumed by :func:`index_prepared`. Any parsing/validation
+    error (``UnsupportedFileType``, ``TextExtractionError``, ``EmbeddingError``)
+    is raised here, before indexing, so a multi-file upload can be made
+    all-or-nothing: nothing is persisted unless every file prepares cleanly.
     """
-    settings = get_settings()
     text = _extract_text(filename, data)
     chunks = chunk_text(text)
+    prepared: dict = {
+        "file_id": str(uuid.uuid4()),
+        "name": filename,
+        "chunks": chunks,
+        "vectors": [],
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if not chunks:
+        return prepared
 
+    vectors = get_embeddings(api_key).embed_documents(chunks)
+    _validate_embeddings(vectors)
+    prepared["vectors"] = vectors
+    return prepared
+
+
+def index_prepared(prepared: dict, user_id: str = PUBLIC_USER_ID) -> dict:
+    """Write an already-prepared file's chunks to Redis (owner-tagged).
+
+    Returns a dict with ``file_id``, ``name``, ``chunks_indexed`` and ``status``
+    so the upload endpoint can serialize it directly.
+    """
+    chunks = prepared["chunks"]
     if not chunks:
         return {
-            "file_id": str(uuid.uuid4()),
-            "name": filename,
+            "file_id": prepared["file_id"],
+            "name": prepared["name"],
             "chunks_indexed": 0,
             "status": "empty",
         }
 
-    embeddings = get_embeddings(api_key).embed_documents(chunks)
-
-    file_id = str(uuid.uuid4())
-    uploaded_at = datetime.now(timezone.utc).isoformat()
+    settings = get_settings()
+    file_id = prepared["file_id"]
     client = get_redis()
     pipe = client.pipeline()
 
-    for idx, (chunk, vector) in enumerate(zip(chunks, embeddings)):
+    for idx, (chunk, vector) in enumerate(zip(chunks, prepared["vectors"])):
         key = f"{settings.redis_key_prefix}{file_id}:chunk:{idx}"
         pipe.hset(
             key,
             mapping={
                 "content": chunk,
-                "source": filename,
+                "source": prepared["name"],
                 "file_id": file_id,
                 "user_id": user_id,
                 "chunk_index": idx,
-                "uploaded_at": uploaded_at,
+                "uploaded_at": prepared["uploaded_at"],
                 "embedding": _to_float32_bytes(vector),
             },
         )
@@ -164,7 +199,22 @@ def ingest_file(
 
     return {
         "file_id": file_id,
-        "name": filename,
+        "name": prepared["name"],
         "chunks_indexed": len(chunks),
         "status": "indexed",
     }
+
+
+def ingest_file(
+    filename: str,
+    data: bytes,
+    api_key: str | None = None,
+    user_id: str = PUBLIC_USER_ID,
+) -> dict:
+    """Run the full ingestion pipeline for a single file (prepare + index).
+
+    ``api_key`` optionally overrides the embedding provider key per request.
+    ``user_id`` tags every chunk so the document is only visible to its owner
+    (``PUBLIC_USER_ID`` when auth is disabled).
+    """
+    return index_prepared(prepare_file(filename, data, api_key), user_id)
