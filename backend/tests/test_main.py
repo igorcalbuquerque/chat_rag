@@ -29,6 +29,14 @@ def test_lifespan_tolerates_index_error(monkeypatch, fake_redis):
         pass
 
 
+def test_root_returns_service_info(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["docs"] == "/docs"
+
+
 def test_health_ok(client):
     response = client.get("/health")
     assert response.status_code == 200

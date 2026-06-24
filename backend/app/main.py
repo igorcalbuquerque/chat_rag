@@ -60,6 +60,21 @@ app.include_router(documents.router, tags=["documents"])
 app.include_router(chat.router, tags=["chat"])
 
 
+@app.get("/")
+def root() -> dict:
+    """Friendly landing payload for the API's primary URL.
+
+    The API has no web UI of its own (the React frontend is a separate service),
+    so the root just points to the docs and health probe instead of a bare 404.
+    """
+    return {
+        "service": "Chat com Documentos via RAG — API",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health", response_model=HealthResponse)
 def health(response: Response) -> HealthResponse:
     """Liveness probe reporting Redis connectivity.

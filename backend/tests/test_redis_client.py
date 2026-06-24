@@ -107,3 +107,60 @@ def test_ensure_index_recreates_when_user_id_field_missing():
     assert client._ft.dropped is True
     assert client._ft.created is True
     redis_client.set_redis(None)
+
+
+def test_has_user_id_field_handles_bytes_keys():
+    # decode_responses=False -> FT.INFO comes back with bytes keys/values.
+    info = {b"attributes": [[b"identifier", b"user_id", b"type", b"TAG"]]}
+    assert redis_client._has_user_id_field(info) is True
+    info_without = {b"attributes": [[b"identifier", b"content", b"type", b"TEXT"]]}
+    assert redis_client._has_user_id_field(info_without) is False
+    assert redis_client._has_user_id_field("not-a-dict") is False
+    # Scalar (non-list) attribute entries are handled too.
+    assert redis_client._has_user_id_field({"attributes": ["user_id"]}) is True
+
+
+def test_ensure_index_tolerates_dropindex_error():
+    # If dropping the outdated index fails, creation still proceeds.
+    class _DropFailsFT(_FakeFT):
+        def dropindex(self, delete_documents=False):
+            raise redis.exceptions.ResponseError("drop failed")
+
+    client = _FakeClient(exists=True, has_user_id=False)
+    client._ft = _DropFailsFT(exists=True, has_user_id=False)
+    redis_client.set_redis(client)
+    redis_client.ensure_index()
+    assert client._ft.created is True
+    redis_client.set_redis(None)
+
+
+def test_ensure_index_swallows_already_exists_on_create():
+    # If creation races and reports "Index already exists", treat as success.
+    class _RacyFT(_FakeFT):
+        def create_index(self, schema, definition=None):
+            raise redis.exceptions.ResponseError("Index already exists")
+
+    client = _FakeClient(exists=False)
+    client._ft = _RacyFT(exists=False)
+    redis_client.set_redis(client)
+    redis_client.ensure_index()  # must not raise
+    redis_client.set_redis(None)
+
+
+def test_ensure_index_reraises_other_create_errors():
+    class _BrokenFT(_FakeFT):
+        def create_index(self, schema, definition=None):
+            raise redis.exceptions.ResponseError("some other failure")
+
+    client = _FakeClient(exists=False)
+    client._ft = _BrokenFT(exists=False)
+    redis_client.set_redis(client)
+    try:
+        raised = False
+        try:
+            redis_client.ensure_index()
+        except redis.exceptions.ResponseError:
+            raised = True
+        assert raised is True
+    finally:
+        redis_client.set_redis(None)

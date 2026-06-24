@@ -74,15 +74,22 @@ def ensure_index() -> None:
     """
     settings = get_settings()
     client = get_redis()
+    ft = client.ft(settings.redis_index_name)
 
     try:
-        info = client.ft(settings.redis_index_name).info()
+        info = ft.info()
+    except redis.exceptions.ResponseError:
+        info = None  # index does not exist yet
+
+    if info is not None:
         if _has_user_id_field(info):
             return  # index already exists with the expected schema
-        # Outdated schema (pre-user_id): drop without deleting the hashes.
-        client.ft(settings.redis_index_name).dropindex(delete_documents=False)
-    except redis.exceptions.ResponseError:
-        pass  # index missing -> create below
+        # Outdated schema (pre-user_id): drop without deleting the hashes so
+        # they get reindexed under the new schema.
+        try:
+            ft.dropindex(delete_documents=False)
+        except redis.exceptions.ResponseError:
+            pass
 
     schema = (
         TextField("content"),
@@ -104,16 +111,30 @@ def ensure_index() -> None:
     definition = IndexDefinition(
         prefix=[settings.redis_key_prefix], index_type=IndexType.HASH
     )
-    client.ft(settings.redis_index_name).create_index(schema, definition=definition)
+    try:
+        ft.create_index(schema, definition=definition)
+    except redis.exceptions.ResponseError as exc:
+        # Treat a concurrent/pre-existing index as success (idempotent).
+        if "already exists" not in str(exc).lower():
+            raise
 
 
-def _has_user_id_field(info: dict) -> bool:
-    """Return True if the index info reports a ``user_id`` attribute."""
-    attributes = info.get("attributes", []) if isinstance(info, dict) else []
-    for attr in attributes:
-        # ``attr`` is a flat list like [b'identifier', b'user_id', ...] or a
-        # list of decoded strings depending on redis-py version.
-        flat = [a.decode() if isinstance(a, bytes) else str(a) for a in attr]
-        if "user_id" in flat:
-            return True
+def _has_user_id_field(info) -> bool:
+    """Return True if the index info reports a ``user_id`` attribute.
+
+    Robust to the Redis client running with ``decode_responses=False`` (keys
+    and values come back as ``bytes``) and to redis-py version differences in
+    how ``FT.INFO`` attributes are shaped.
+    """
+    if not isinstance(info, dict):
+        return False
+    attributes = info.get("attributes")
+    if attributes is None:
+        attributes = info.get(b"attributes", [])
+    for attr in attributes or []:
+        items = attr if isinstance(attr, (list, tuple)) else [attr]
+        for item in items:
+            value = item.decode() if isinstance(item, bytes) else str(item)
+            if value == "user_id":
+                return True
     return False
