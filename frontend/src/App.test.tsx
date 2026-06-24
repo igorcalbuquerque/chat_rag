@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import App from './App'
 import { getConfig, getMe, listDocuments } from './api/client'
 import type { AppConfig } from './types'
@@ -55,5 +55,27 @@ describe('App', () => {
       expect(screen.getByText(/entrar com google/i)).toBeInTheDocument(),
     )
     expect(screen.getByText(/entrar com github/i)).toBeInTheDocument()
+  })
+
+  it('shows the "waking the server" hint after a few seconds of loading', () => {
+    vi.useFakeTimers()
+    // Keep startup pending so the loading screen stays up.
+    vi.mocked(getConfig).mockReturnValue(new Promise(() => {}))
+
+    try {
+      render(<App />)
+
+      // Loading immediately, hint not yet.
+      expect(screen.getByText(/carregando/i)).toBeInTheDocument()
+      expect(screen.queryByText(/acordando o servidor/i)).not.toBeInTheDocument()
+
+      // After the delay, the hint appears.
+      act(() => {
+        vi.advanceTimersByTime(4000)
+      })
+      expect(screen.getByText(/acordando o servidor/i)).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

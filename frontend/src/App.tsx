@@ -56,6 +56,10 @@ export default function App() {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [authReady, setAuthReady] = useState(false)
+  // The backend runs on a free tier that sleeps after inactivity; the first
+  // request can take ~30–60s to wake it. If startup is still pending after a
+  // few seconds, surface a hint so the loading screen doesn't feel stuck.
+  const [slowStart, setSlowStart] = useState(false)
 
   const authRequired = !!config?.auth_enabled
   const canUse = authReady && (!authRequired || !!user)
@@ -76,6 +80,13 @@ export default function App() {
       .catch(() => setConfig({ auth_enabled: false, auth_providers: [], llm_provider: '', supported_llm_providers: [] }))
       .finally(() => setAuthReady(true))
   }, [])
+
+  // Reveal the "waking the server" hint if startup is still pending after 4s.
+  useEffect(() => {
+    if (authReady) return
+    const timer = setTimeout(() => setSlowStart(true), 4000)
+    return () => clearTimeout(timer)
+  }, [authReady])
 
   // A 401 anywhere (expired token) drops the user back to the login screen.
   useEffect(() => {
@@ -156,7 +167,16 @@ export default function App() {
   }
 
   if (!authReady) {
-    return <div className="app-loading">Carregando…</div>
+    return (
+      <div className="app-loading">
+        <p>Carregando…</p>
+        {slowStart && (
+          <p className="app-loading-hint">
+            Acordando o servidor… no primeiro acesso isso pode levar até 1 minuto.
+          </p>
+        )}
+      </div>
+    )
   }
 
   if (authRequired && !user) {
