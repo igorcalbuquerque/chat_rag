@@ -14,6 +14,18 @@ describe('DocumentList', () => {
     expect(screen.getByText(/nenhum documento indexado/i)).toBeInTheDocument()
   })
 
+  it('shows a loading indicator (not the empty state) on first load', () => {
+    render(<DocumentList documents={[]} onDelete={() => {}} loading />)
+    expect(screen.getByText(/carregando documentos/i)).toBeInTheDocument()
+    expect(screen.queryByText(/nenhum documento indexado/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps showing the list plus an "updating" hint while refreshing', () => {
+    render(<DocumentList documents={docs} onDelete={() => {}} loading />)
+    expect(screen.getByText('report.pdf')).toBeInTheDocument()
+    expect(screen.getByText(/atualizando/i)).toBeInTheDocument()
+  })
+
   it('renders each document with its chunk count', () => {
     render(<DocumentList documents={docs} onDelete={() => {}} />)
     expect(screen.getByText('report.pdf')).toBeInTheDocument()

@@ -33,8 +33,18 @@ def list_documents(user_id: str = PUBLIC_USER_ID) -> list[dict]:
     client = get_redis()
     docs: dict[str, dict] = {}
 
-    for key in _iter_chunk_keys():
-        fields = client.hmget(key, "file_id", "source", "uploaded_at", "user_id")
+    keys = _iter_chunk_keys()
+    if not keys:
+        return []
+
+    # Fetch every chunk's metadata in a single round-trip. Doing one ``hmget``
+    # per key is fine on a local Redis but turns into thousands of sequential
+    # network calls against a remote Redis (e.g. Redis Cloud in production),
+    # which made the document list take many seconds to appear.
+    pipe = client.pipeline()
+    for key in keys:
+        pipe.hmget(key, "file_id", "source", "uploaded_at", "user_id")
+    for fields in pipe.execute():
         file_id = _decode(fields[0])
         if not file_id or _decode(fields[3]) != user_id:
             continue
@@ -62,12 +72,16 @@ def delete_document(file_id: str, user_id: str = PUBLIC_USER_ID) -> bool:
     settings = get_settings()
     client = get_redis()
     pattern = f"{settings.redis_key_prefix}{file_id}:chunk:*"
-    keys = [
-        key
-        for key in client.scan_iter(match=pattern, count=500)
-        if _decode(client.hget(key, "user_id")) == user_id
-    ]
+    keys = list(client.scan_iter(match=pattern, count=500))
     if not keys:
         return False
-    client.delete(*keys)
+
+    # Check ownership of all chunks in one round-trip (see list_documents).
+    pipe = client.pipeline()
+    for key in keys:
+        pipe.hget(key, "user_id")
+    owned = [key for key, owner in zip(keys, pipe.execute()) if _decode(owner) == user_id]
+    if not owned:
+        return False
+    client.delete(*owned)
     return True

@@ -49,6 +49,7 @@ export default function App() {
   )
   const [activeId, setActiveId] = useState<string>(() => sessions[0].id)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false) // mobile drawer
 
   // Auth state. config === null while loading. When auth is disabled the app
@@ -100,10 +101,13 @@ export default function App() {
   }, [sessions])
 
   const refreshDocuments = useCallback(async () => {
+    setDocumentsLoading(true)
     try {
       setDocuments(await listDocuments())
     } catch {
       setDocuments([])
+    } finally {
+      setDocumentsLoading(false)
     }
   }, [])
 
@@ -217,7 +221,11 @@ export default function App() {
         <FileUpload onUploaded={refreshDocuments} />
         <section>
           <h3>Documentos</h3>
-          <DocumentList documents={documents} onDelete={handleDeleteDocument} />
+          <DocumentList
+            documents={documents}
+            onDelete={handleDeleteDocument}
+            loading={documentsLoading}
+          />
         </section>
         <SessionSidebar
           sessions={sessions}
