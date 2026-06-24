@@ -630,3 +630,7 @@ chat_rag/
 - ✅ **Optional Google/GitHub login** with per-user data isolation.
 - ✅ **TypeScript frontend** (strict) with a **Vitest + Testing Library** suite
   (38 tests, ~88% coverage) wired into CI.
+
+---
+
+<p align="center"><sub>Built by <a href="https://www.linkedin.com/in/igorcezaralbuquerque"><strong>Igor Albuquerque</strong></a></sub></p>

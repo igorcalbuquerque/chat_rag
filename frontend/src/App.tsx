@@ -227,6 +227,16 @@ export default function App() {
           onRename={renameSession}
           onDelete={deleteSession}
         />
+        <footer className="sidebar-credit">
+          By{' '}
+          <a
+            href="https://www.linkedin.com/in/igorcezaralbuquerque"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <strong>Igor Albuquerque</strong>
+          </a>
+        </footer>
       </aside>
 
       <main className="main">

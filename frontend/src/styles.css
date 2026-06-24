@@ -143,6 +143,36 @@ button {
   flex-shrink: 0;
 }
 
+.sidebar-credit {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+.sidebar-credit strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.sidebar-credit a,
+.login-credit a {
+  color: inherit;
+  text-decoration: none;
+}
+.sidebar-credit a:hover strong,
+.login-credit a:hover strong {
+  text-decoration: underline;
+}
+.login-credit {
+  margin-top: 18px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.login-credit strong {
+  color: var(--text);
+  font-weight: 600;
+}
 .sidebar h3 {
   font-size: 12px;
   text-transform: uppercase;

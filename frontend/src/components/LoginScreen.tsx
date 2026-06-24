@@ -66,6 +66,16 @@ export default function LoginScreen({ providers }: LoginScreenProps) {
         <small className="muted">
           Seus documentos e conversas ficam visíveis apenas para a sua conta.
         </small>
+        <p className="login-credit">
+          By{' '}
+          <a
+            href="https://www.linkedin.com/in/igorcezaralbuquerque"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <strong>Igor Albuquerque</strong>
+          </a>
+        </p>
       </div>
     </div>
   )
