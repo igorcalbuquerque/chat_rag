@@ -11,9 +11,10 @@
 #   - REDIS_URL          -> segredo (rediss://default:<senha>@<host>:<porta>)
 #   - VITE_API_BASE_URL  -> so existe depois do 1o deploy do backend
 #
-# IA via BYOK: nenhuma chave de provider fica no servidor. O avaliador cola a
-# propria chave OpenAI no campo da UI (header X-API-Key), usada tanto para os
-# embeddings quanto para o LLM.
+# IA via BYOK: nenhuma chave de provider fica no servidor. Cada visitante cola a
+# propria chave no campo da UI (header X-API-Key). Como os embeddings sao fixos
+# no servidor (EMBEDDING_PROVIDER abaixo), essa chave precisa ser do MESMO
+# provider dos embeddings para que o upload/indexacao funcione.
 
 services:
   # ---------------------------------------------------------------- Backend
