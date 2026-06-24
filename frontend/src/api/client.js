@@ -10,16 +10,63 @@ const api = axios.create({ baseURL: API_BASE })
 
 export const API_KEY_STORAGE = 'chat-rag-api-key'
 export const PROVIDER_STORAGE = 'chat-rag-llm-provider'
+export const AUTH_TOKEN_STORAGE = 'chat-rag-token'
+
+export function getToken() {
+  return localStorage.getItem(AUTH_TOKEN_STORAGE) || ''
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(AUTH_TOKEN_STORAGE, token)
+  else localStorage.removeItem(AUTH_TOKEN_STORAGE)
+}
 
 // Optional bring-your-own-key + LLM provider: if the user saved them, send
-// per request. The server falls back to its .env config when absent.
+// per request. The server falls back to its .env config when absent. When
+// login is enabled, the signed session token is sent as a bearer header.
 function authHeaders() {
   const headers = {}
   const key = localStorage.getItem(API_KEY_STORAGE)
   const provider = localStorage.getItem(PROVIDER_STORAGE)
+  const token = getToken()
   if (key) headers['X-API-Key'] = key
   if (provider) headers['X-LLM-Provider'] = provider
+  if (token) headers['Authorization'] = `Bearer ${token}`
   return headers
+}
+
+// On an expired/invalid token the server replies 401. Drop the token and let
+// the app fall back to the login screen via a global event.
+function handleUnauthorized() {
+  setToken('')
+  window.dispatchEvent(new Event('auth:unauthorized'))
+}
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) handleUnauthorized()
+    return Promise.reject(error)
+  },
+)
+
+// OAuth helpers (used only when the server reports auth_enabled).
+export function loginUrl(provider) {
+  return `${API_BASE}/auth/login/${provider}`
+}
+
+export async function getMe() {
+  const { data } = await api.get('/auth/me')
+  return data
+}
+
+export async function logout() {
+  setToken('')
+  try {
+    await api.post('/auth/logout')
+  } catch {
+    /* best-effort: the token is already cleared client-side */
+  }
 }
 
 export async function uploadFiles(files, onProgress, signal) {
@@ -68,6 +115,7 @@ export async function streamChat({ question, sessionId, topK }, { onToken, onDon
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ question, session_id: sessionId, top_k: topK }),
     })
+    if (response.status === 401) handleUnauthorized()
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`)
 
     const reader = response.body.getReader()

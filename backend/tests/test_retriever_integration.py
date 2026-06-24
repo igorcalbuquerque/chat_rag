@@ -127,8 +127,8 @@ def real_redis():
 @pytest.fixture(autouse=True)
 def patch_embeddings(monkeypatch):
     emb = IntegrationEmbeddings()
-    monkeypatch.setattr(ingestion, "get_embeddings", lambda: emb)
-    monkeypatch.setattr(retriever, "get_embeddings", lambda: emb)
+    monkeypatch.setattr(ingestion, "get_embeddings", lambda *a, **k: emb)
+    monkeypatch.setattr(retriever, "get_embeddings", lambda *a, **k: emb)
     return emb
 
 
@@ -154,3 +154,18 @@ def test_index_ingest_retrieve_delete(real_redis):
     assert documents.delete_document(doc_a["file_id"]) is True
     after = retriever.retrieve("Qual foi o lucro do trimestre?", top_k=5)
     assert all(r["source"] != "finance.txt" for r in after)
+
+
+def test_retrieval_is_isolated_per_user(real_redis):
+    # A document owned by another user must never surface for the default user.
+    ingestion.ingest_file(
+        "secreto.txt",
+        b"Informacao confidencial do outro usuario sobre lucros.",
+        user_id="other_user",
+    )
+    results = retriever.retrieve("lucros confidenciais", top_k=5)
+    assert all(r["source"] != "secreto.txt" for r in results)
+
+    # The owner does see it.
+    owned = retriever.retrieve("lucros confidenciais", top_k=5, user_id="other_user")
+    assert any(r["source"] == "secreto.txt" for r in owned)

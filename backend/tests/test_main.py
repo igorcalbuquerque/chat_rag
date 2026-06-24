@@ -55,6 +55,22 @@ def test_config_local_provider_needs_no_key(client):
     ]
 
 
+def test_config_reports_auth_disabled_by_default(client):
+    body = client.get("/config").json()
+    assert body["auth_enabled"] is False
+    assert body["auth_providers"] == []
+
+
+def test_config_reports_auth_enabled(client, monkeypatch):
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    body = client.get("/config").json()
+    assert body["auth_enabled"] is True
+    assert body["auth_providers"] == ["google", "github"]
+
+
 def test_config_reports_key_provider(client, monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")

@@ -16,7 +16,7 @@ from typing import Iterator, TypedDict
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, START, StateGraph
 
-from app.config import get_settings
+from app.config import PUBLIC_USER_ID, get_settings
 from app.services.history import get_history
 from app.services.llm import get_llm
 from app.services.retriever import retrieve
@@ -35,6 +35,7 @@ class RAGState(TypedDict, total=False):
     question: str
     session_id: str
     top_k: int
+    user_id: str  # owner scope for retrieval and history
     api_key: str | None  # per-request provider key override (BYOK)
     llm_provider: str | None  # per-request LLM provider override
     history: list[dict]
@@ -47,13 +48,18 @@ class RAGState(TypedDict, total=False):
 # --- Nodes ---
 def retriever_node(state: RAGState) -> RAGState:
     """Semantic search in Redis to fetch the most relevant chunks."""
-    chunks = retrieve(state["question"], state.get("top_k"), state.get("api_key"))
+    chunks = retrieve(
+        state["question"],
+        state.get("top_k"),
+        state.get("api_key"),
+        state.get("user_id", PUBLIC_USER_ID),
+    )
     return {"retrieved_chunks": chunks}
 
 
 def context_builder_node(state: RAGState) -> RAGState:
     """Assemble the prompt from retrieved context and conversation history."""
-    history = get_history(state["session_id"])
+    history = get_history(state["session_id"], state.get("user_id", PUBLIC_USER_ID))
 
     context = "\n\n".join(
         f"[{i + 1}] (source: {c['source']})\n{c['chunk']}"
@@ -126,6 +132,7 @@ def run_rag(
     top_k: int | None = None,
     api_key: str | None = None,
     llm_provider: str | None = None,
+    user_id: str = PUBLIC_USER_ID,
 ) -> dict:
     """Execute the full RAG graph and return ``answer`` + ``sources``."""
     settings = get_settings()
@@ -133,6 +140,7 @@ def run_rag(
         "question": question,
         "session_id": session_id,
         "top_k": top_k or settings.top_k,
+        "user_id": user_id,
         "api_key": api_key,
         "llm_provider": llm_provider,
     }
@@ -150,6 +158,7 @@ def stream_rag(
     top_k: int | None = None,
     api_key: str | None = None,
     llm_provider: str | None = None,
+    user_id: str = PUBLIC_USER_ID,
 ) -> tuple[Iterator[str], list[dict]]:
     """Run retrieval + context building, then stream LLM tokens.
 
@@ -163,6 +172,7 @@ def stream_rag(
         "question": question,
         "session_id": session_id,
         "top_k": top_k or settings.top_k,
+        "user_id": user_id,
         "api_key": api_key,
         "llm_provider": llm_provider,
     }

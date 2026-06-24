@@ -98,7 +98,11 @@ def fake_retriever(monkeypatch):
             "score": 0.91,
         }
     ]
-    monkeypatch.setattr(rag_graph, "retrieve", lambda q, k=None, api_key=None: chunks)
+    monkeypatch.setattr(
+        rag_graph,
+        "retrieve",
+        lambda q, k=None, api_key=None, user_id="public": chunks,
+    )
     return chunks
 
 
@@ -108,3 +112,28 @@ def client(fake_redis):
     from app.main import app
 
     return TestClient(app)
+
+
+@pytest.fixture
+def auth_client(fake_redis, monkeypatch):
+    """TestClient with auth enabled plus a valid bearer token for a test user.
+
+    Returns ``(client, headers, user)`` so tests can exercise the protected,
+    user-scoped endpoints exactly as a logged-in browser would.
+    """
+    from app.services import auth as auth_service
+
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    config.get_settings.cache_clear()
+
+    from app.main import app
+
+    user = {
+        "user_id": "google_tester",
+        "name": "Tester",
+        "email": "t@example.com",
+        "provider": "google",
+    }
+    token = auth_service.make_token(user)
+    headers = {"Authorization": f"Bearer {token}"}
+    return TestClient(app), headers, user

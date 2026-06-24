@@ -8,21 +8,22 @@ from __future__ import annotations
 
 import json
 
-from app.config import get_settings
+from app.config import PUBLIC_USER_ID, get_settings
 from app.services.redis_client import get_redis
 
 _HISTORY_PREFIX = "session:"
 
 
-def _key(session_id: str) -> str:
-    return f"{_HISTORY_PREFIX}{session_id}"
+def _key(session_id: str, user_id: str) -> str:
+    # Namespacing by user keeps two users' identically-named sessions apart.
+    return f"{_HISTORY_PREFIX}{user_id}:{session_id}"
 
 
-def get_history(session_id: str) -> list[dict]:
-    """Return the stored messages for a session (oldest first)."""
+def get_history(session_id: str, user_id: str = PUBLIC_USER_ID) -> list[dict]:
+    """Return the stored messages for a user's session (oldest first)."""
     settings = get_settings()
     client = get_redis()
-    raw = client.lrange(_key(session_id), -settings.history_size, -1)
+    raw = client.lrange(_key(session_id, user_id), -settings.history_size, -1)
     messages: list[dict] = []
     for item in raw:
         text = item.decode("utf-8") if isinstance(item, bytes) else item
@@ -33,11 +34,13 @@ def get_history(session_id: str) -> list[dict]:
     return messages
 
 
-def append_message(session_id: str, role: str, content: str) -> None:
-    """Append a message to the session and trim to the configured window."""
+def append_message(
+    session_id: str, role: str, content: str, user_id: str = PUBLIC_USER_ID
+) -> None:
+    """Append a message to the user's session and trim to the configured window."""
     settings = get_settings()
     client = get_redis()
-    key = _key(session_id)
+    key = _key(session_id, user_id)
     client.rpush(key, json.dumps({"role": role, "content": content}))
     # Keep only the last ``history_size`` messages.
     client.ltrim(key, -settings.history_size, -1)

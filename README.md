@@ -265,6 +265,38 @@ docker compose logs -f           # all services
 | `INSTALL_OCR`        | build flag: install OCR stack for scanned PDFs      | `false`                |
 | `OCR_LANGUAGE`       | Tesseract languages (`+`-separated)                | `por+eng`              |
 | `OCR_DPI`            | render DPI used for OCR                             | `200`                  |
+| `AUTH_ENABLED`       | require Google/GitHub login (production)            | `false`                |
+| `BACKEND_URL`        | public backend URL (for OAuth redirect URIs)       | —                      |
+| `FRONTEND_URL`       | where to return after login                         | `/`                    |
+| `SESSION_SECRET`     | signs the login token (change in production)        | `dev-insecure-…`       |
+| `GOOGLE_OAUTH_CLIENT_ID` / `..._SECRET` | Google OAuth app credentials    | —                      |
+| `GITHUB_OAUTH_CLIENT_ID` / `..._SECRET` | GitHub OAuth app credentials    | —                      |
+
+### Authentication / login (optional)
+
+Login is **off by default**: running locally needs no accounts — just start it
+and use it. For a **public deployment** set `AUTH_ENABLED=true` and visitors must
+sign in with **Google or GitHub**; each user then only sees **their own**
+documents and conversations (data is tagged per user). This is independent of
+BYOK — the LLM key in the sidebar still works the same way.
+
+How it works: the OAuth handshake happens on the backend (Authlib); on success
+the backend issues a **signed token** and redirects back to the UI, which stores
+it and sends it as `Authorization: Bearer` on every request. The API stays
+stateless (no cross-site cookies).
+
+**Enabling it (production):**
+
+1. **Create the OAuth apps** and register the callback URLs:
+   - Google — [Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+     → *OAuth client ID* (type *Web*). Authorized redirect URI:
+     `<BACKEND_URL>/auth/callback/google`
+   - GitHub — [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
+     → *New OAuth App*. Authorization callback URL:
+     `<BACKEND_URL>/auth/callback/github`
+2. Set `AUTH_ENABLED=true`, `BACKEND_URL`, `FRONTEND_URL`, a strong
+   `SESSION_SECRET`, and the four `*_OAUTH_*` values.
+3. Redeploy. The UI now shows a login screen until the user signs in.
 
 ### Chat provider + API key (bring-your-own-key)
 
@@ -383,6 +415,7 @@ backend/tests/
 ├── test_redis_client.py          # connection, ping, index creation
 ├── test_retriever.py             # KNN result parsing
 ├── test_main.py                  # lifespan, /health, /config
+├── test_auth.py                  # OAuth login, tokens, user isolation gate
 ├── test_misc.py                  # config, history, small edge cases
 └── test_retriever_integration.py # real Redis Stack (opt-in, `-m integration`)
 ```
@@ -406,6 +439,11 @@ backend/tests/
   context with no dependency on in-memory API state.
 - **Streaming via SSE** with `fetch` on the frontend (POST), `proxy_buffering off`
   in Nginx for token-by-token delivery.
+- **Optional auth via one code path:** every operation is scoped to a `user_id`
+  (a fixed public id when login is off, the OAuth identity when on). The same
+  ingestion/retrieval/history code runs in both modes; the retriever simply adds
+  a `@user_id` pre-filter to the KNN query. Token-based (no cross-site cookies),
+  so the API stays stateless and works across split frontend/backend domains.
 
 ---
 
@@ -438,3 +476,5 @@ chat_rag/
 - ✅ **Bring-your-own-key + per-request LLM provider** chosen in the UI.
 - ✅ **Google Gemini** provider (LLM + embeddings), incl. a free-tier path.
 - ✅ **Cancelable uploads** and 100% backend test coverage.
+- ✅ **Optional Google/GitHub login** with per-user document/conversation
+  isolation (off locally, on in production).

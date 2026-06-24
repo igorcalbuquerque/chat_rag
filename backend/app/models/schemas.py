@@ -77,3 +77,6 @@ class ConfigResponse(BaseModel):
     # which key to paste). Empty when the server runs fully local (no key).
     key_providers: list[str]
     requires_api_key: bool
+    # Whether login is required (production) and which OAuth providers to show.
+    auth_enabled: bool = False
+    auth_providers: list[str] = []

@@ -15,7 +15,7 @@ from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
-from app.config import get_settings
+from app.config import PUBLIC_USER_ID, get_settings
 from app.services.embeddings import get_embeddings
 from app.services.redis_client import get_redis
 
@@ -113,12 +113,19 @@ def _to_float32_bytes(vector: list[float]) -> bytes:
     return np.asarray(vector, dtype=np.float32).tobytes()
 
 
-def ingest_file(filename: str, data: bytes, api_key: str | None = None) -> dict:
+def ingest_file(
+    filename: str,
+    data: bytes,
+    api_key: str | None = None,
+    user_id: str = PUBLIC_USER_ID,
+) -> dict:
     """Run the full ingestion pipeline for a single file.
 
     ``api_key`` optionally overrides the embedding provider key per request.
-    Returns a dict with ``file_id``, ``name``, ``chunks_indexed`` and
-    ``status`` so the upload endpoint can serialize it directly.
+    ``user_id`` tags every chunk so the document is only visible to its owner
+    (``PUBLIC_USER_ID`` when auth is disabled). Returns a dict with ``file_id``,
+    ``name``, ``chunks_indexed`` and ``status`` so the upload endpoint can
+    serialize it directly.
     """
     settings = get_settings()
     text = _extract_text(filename, data)
@@ -147,6 +154,7 @@ def ingest_file(filename: str, data: bytes, api_key: str | None = None) -> dict:
                 "content": chunk,
                 "source": filename,
                 "file_id": file_id,
+                "user_id": user_id,
                 "chunk_index": idx,
                 "uploaded_at": uploaded_at,
                 "embedding": _to_float32_bytes(vector),

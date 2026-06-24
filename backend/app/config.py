@@ -28,6 +28,12 @@ SUPPORTED_LLM_PROVIDERS = ("openai", "anthropic", "gemini", "ollama")
 # Providers that authenticate with an API key (vs local Ollama / Sentence-T.).
 KEY_PROVIDERS = ("openai", "anthropic", "gemini")
 
+# OAuth login providers offered when AUTH_ENABLED is on.
+AUTH_PROVIDERS = ("google", "github")
+# user_id used when auth is disabled (local dev): everything is scoped to it,
+# so the same data-isolation code path runs with or without login.
+PUBLIC_USER_ID = "public"
+
 
 class Settings(BaseSettings):
     """Strongly-typed application settings."""
@@ -73,6 +79,28 @@ class Settings(BaseSettings):
     # --- OCR (optional, for scanned PDFs) ---
     ocr_language: str = "por+eng"
     ocr_dpi: int = 200
+
+    # --- Authentication (optional; OFF for local dev, ON in production) ---
+    # When false, the app is open and all data is scoped to PUBLIC_USER_ID.
+    # When true, visitors must log in via Google/GitHub and each user only
+    # sees their own documents and conversations.
+    auth_enabled: bool = False
+    google_oauth_client_id: str | None = None
+    google_oauth_client_secret: str | None = None
+    github_oauth_client_id: str | None = None
+    github_oauth_client_secret: str | None = None
+    # Signs both the OAuth handshake session cookie and the issued bearer token.
+    # MUST be overridden with a strong random value in production.
+    session_secret: str = "dev-insecure-secret-change-me"
+    # Where the OAuth callback redirects the browser back to after login.
+    frontend_url: str = "/"
+    # Public base URL of this backend (e.g. https://chat-rag-api.onrender.com).
+    # Used to build the OAuth redirect URI so it exactly matches what is
+    # registered in the provider console (avoids http/https proxy mismatches).
+    # When unset, the URL is derived from the incoming request.
+    backend_url: str | None = None
+    # Lifetime of an issued login token.
+    token_ttl_seconds: int = 60 * 60 * 8
 
     @property
     def embedding_dimension(self) -> int:

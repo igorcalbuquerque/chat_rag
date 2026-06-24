@@ -43,6 +43,34 @@ services:
         sync: false
       # OPENAI_API_KEY propositalmente ausente -> BYOK (a chave vem da UI).
 
+      # ---- Login OAuth (produção) -------------------------------------
+      # Liga o login: visitantes precisam entrar com Google ou GitHub e cada
+      # usuário só enxerga seus próprios documentos/conversas. Local roda sem
+      # login (AUTH_ENABLED ausente/false).
+      - key: AUTH_ENABLED
+        value: "true"
+      # URL pública DESTE backend (https). Usada para montar a redirect URI do
+      # OAuth — deve bater exatamente com a registrada no Google/GitHub.
+      # Ex.: https://chat-rag-api.onrender.com
+      - key: BACKEND_URL
+        sync: false
+      # Para onde voltar após o login (URL do site chat-rag-web).
+      # Ex.: https://chat-rag-web.onrender.com
+      - key: FRONTEND_URL
+        sync: false
+      # Segredo forte que assina a sessão do handshake e o token de login.
+      - key: SESSION_SECRET
+        sync: false
+      # Credenciais das OAuth apps (preencher no painel; nunca commitar).
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+
   # --------------------------------------------------------------- Frontend
   - type: web
     name: chat-rag-web

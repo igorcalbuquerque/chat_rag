@@ -55,22 +55,28 @@ def test_ping_false_on_error():
 
 # --- ensure_index ---
 class _FakeFT:
-    def __init__(self, exists: bool):
+    def __init__(self, exists: bool, has_user_id: bool = True):
         self._exists = exists
+        self._has_user_id = has_user_id
         self.created = False
+        self.dropped = False
 
     def info(self):
         if not self._exists:
             raise redis.exceptions.ResponseError("Unknown index name")
-        return {"num_docs": 0}
+        field = "user_id" if self._has_user_id else "content"
+        return {"attributes": [["identifier", field, "attribute", field, "type", "TAG"]]}
+
+    def dropindex(self, delete_documents=False):
+        self.dropped = True
 
     def create_index(self, schema, definition=None):
         self.created = True
 
 
 class _FakeClient:
-    def __init__(self, exists: bool):
-        self._ft = _FakeFT(exists)
+    def __init__(self, exists: bool, has_user_id: bool = True):
+        self._ft = _FakeFT(exists, has_user_id)
 
     def ft(self, name):
         return self._ft
@@ -85,8 +91,19 @@ def test_ensure_index_creates_when_missing():
 
 
 def test_ensure_index_is_idempotent_when_present():
-    client = _FakeClient(exists=True)
+    client = _FakeClient(exists=True, has_user_id=True)
     redis_client.set_redis(client)
     redis_client.ensure_index()
     assert client._ft.created is False  # not recreated
+    assert client._ft.dropped is False
+    redis_client.set_redis(None)
+
+
+def test_ensure_index_recreates_when_user_id_field_missing():
+    # An older index without the user_id field is dropped and rebuilt.
+    client = _FakeClient(exists=True, has_user_id=False)
+    redis_client.set_redis(client)
+    redis_client.ensure_index()
+    assert client._ft.dropped is True
+    assert client._ft.created is True
     redis_client.set_redis(None)

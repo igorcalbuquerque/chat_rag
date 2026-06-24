@@ -39,7 +39,7 @@ def test_list_documents_skips_keys_without_file_id(fake_redis):
 
 # --- history ---
 def test_get_history_skips_malformed_entries(fake_redis):
-    key = history._key("s1")
+    key = history._key("s1", "public")
     fake_redis.rpush(key, b"not valid json")
     fake_redis.rpush(key, json.dumps({"role": "user", "content": "hi"}))
 

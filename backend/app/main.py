@@ -11,10 +11,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
-from app.config import KEY_PROVIDERS, SUPPORTED_LLM_PROVIDERS, get_settings
+from app.config import (
+    AUTH_PROVIDERS,
+    KEY_PROVIDERS,
+    SUPPORTED_LLM_PROVIDERS,
+    get_settings,
+)
 from app.models.schemas import ConfigResponse, HealthResponse
-from app.routers import chat, documents, upload
+from app.routers import auth, chat, documents, upload
 from app.services import redis_client
 
 logger = logging.getLogger("chat_rag")
@@ -34,14 +40,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Chat com Documentos via RAG", version="1.0.0", lifespan=lifespan)
 
+# The API authenticates with a bearer token (no cross-site cookies), so a
+# wildcard origin without credentials is the correct, valid CORS combination.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Needed for the OAuth handshake (Authlib stores state/nonce in the session
+# cookie). Harmless when login is disabled: no cookie is set unless written.
+app.add_middleware(SessionMiddleware, secret_key=get_settings().session_secret)
+
+app.include_router(auth.router, tags=["auth"])
 app.include_router(upload.router, tags=["upload"])
 app.include_router(documents.router, tags=["documents"])
 app.include_router(chat.router, tags=["chat"])
@@ -77,4 +90,6 @@ def config_info() -> ConfigResponse:
         supported_llm_providers=list(SUPPORTED_LLM_PROVIDERS),
         key_providers=key_providers,
         requires_api_key=bool(key_providers),
+        auth_enabled=settings.auth_enabled,
+        auth_providers=list(AUTH_PROVIDERS) if settings.auth_enabled else [],
     )

@@ -6,6 +6,7 @@ The index stores one Redis HASH per chunk under the key
     content      TEXT      the raw chunk text
     source       TAG       original file name
     file_id      TAG       uuid grouping all chunks of a document
+    user_id      TAG       owner (PUBLIC_USER_ID when auth is disabled)
     chunk_index  NUMERIC   position of the chunk within the document
     uploaded_at  TEXT      ISO-8601 upload timestamp
     embedding    VECTOR    float32 embedding (HNSW, COSINE distance)
@@ -65,15 +66,21 @@ def ping() -> bool:
 def ensure_index() -> None:
     """Create the RediSearch vector index if it does not already exist.
 
-    Idempotent: a pre-existing index is treated as success so the call is
-    safe to run on every application startup.
+    Idempotent: a pre-existing index with the expected schema is treated as
+    success. If an older index without the ``user_id`` field is found, it is
+    dropped (keeping the documents) and recreated so per-user filtering works.
+    Note: documents indexed before ``user_id`` existed won't carry the field
+    and become invisible to user-scoped queries — re-upload them.
     """
     settings = get_settings()
     client = get_redis()
 
     try:
-        client.ft(settings.redis_index_name).info()
-        return  # index already exists
+        info = client.ft(settings.redis_index_name).info()
+        if _has_user_id_field(info):
+            return  # index already exists with the expected schema
+        # Outdated schema (pre-user_id): drop without deleting the hashes.
+        client.ft(settings.redis_index_name).dropindex(delete_documents=False)
     except redis.exceptions.ResponseError:
         pass  # index missing -> create below
 
@@ -81,6 +88,7 @@ def ensure_index() -> None:
         TextField("content"),
         TagField("source"),
         TagField("file_id"),
+        TagField("user_id"),
         NumericField("chunk_index"),
         TextField("uploaded_at"),
         VectorField(
@@ -97,3 +105,15 @@ def ensure_index() -> None:
         prefix=[settings.redis_key_prefix], index_type=IndexType.HASH
     )
     client.ft(settings.redis_index_name).create_index(schema, definition=definition)
+
+
+def _has_user_id_field(info: dict) -> bool:
+    """Return True if the index info reports a ``user_id`` attribute."""
+    attributes = info.get("attributes", []) if isinstance(info, dict) else []
+    for attr in attributes:
+        # ``attr`` is a flat list like [b'identifier', b'user_id', ...] or a
+        # list of decoded strings depending on redis-py version.
+        flat = [a.decode() if isinstance(a, bytes) else str(a) for a in attr]
+        if "user_id" in flat:
+            return True
+    return False

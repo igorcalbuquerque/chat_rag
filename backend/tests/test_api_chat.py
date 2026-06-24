@@ -44,7 +44,9 @@ def test_chat_forwards_api_key_header(client, monkeypatch):
 
     captured = {}
 
-    def fake_run_rag(question, session_id, top_k=None, api_key=None, llm_provider=None):
+    def fake_run_rag(
+        question, session_id, top_k=None, api_key=None, llm_provider=None, user_id="public"
+    ):
         captured["api_key"] = api_key
         return {"answer": "ok", "sources": [], "session_id": session_id}
 
@@ -63,7 +65,9 @@ def test_chat_forwards_llm_provider_header(client, monkeypatch):
 
     captured = {}
 
-    def fake_run_rag(question, session_id, top_k=None, api_key=None, llm_provider=None):
+    def fake_run_rag(
+        question, session_id, top_k=None, api_key=None, llm_provider=None, user_id="public"
+    ):
         captured["provider"] = llm_provider
         return {"answer": "ok", "sources": [], "session_id": session_id}
 
