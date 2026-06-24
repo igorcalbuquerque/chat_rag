@@ -1,3 +1,14 @@
+import type { Session } from '../types'
+
+interface SessionSidebarProps {
+  sessions: Session[]
+  activeId: string
+  onSelect: (id: string) => void
+  onCreate: () => void
+  onRename: (id: string, name: string) => void
+  onDelete: (id: string) => void
+}
+
 // Sidebar listing chat sessions, with create / rename / delete actions.
 export default function SessionSidebar({
   sessions,
@@ -6,7 +17,7 @@ export default function SessionSidebar({
   onCreate,
   onRename,
   onDelete,
-}) {
+}: SessionSidebarProps) {
   return (
     <div className="sessions">
       <div className="sessions-head">

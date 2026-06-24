@@ -1,5 +1,12 @@
+import type { DocumentItem } from '../types'
+
+interface DocumentListProps {
+  documents: DocumentItem[]
+  onDelete: (fileId: string) => void
+}
+
 // List of indexed documents with a remove button per document.
-export default function DocumentList({ documents, onDelete }) {
+export default function DocumentList({ documents, onDelete }: DocumentListProps) {
   if (!documents.length) {
     return <p className="muted">Nenhum documento indexado ainda.</p>
   }

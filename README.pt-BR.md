@@ -105,7 +105,7 @@ Toda a stack sobe com **um único comando** — exatamente como o desafio exige
 
 | Camada       | Tecnologia                                            |
 |--------------|-------------------------------------------------------|
-| Frontend     | React 18 + Vite, servido via Nginx                    |
+| Frontend     | React 18 + TypeScript + Vite, servido via Nginx       |
 | API          | Python 3.11, FastAPI, LangChain + LangGraph           |
 | Vector Store | Redis Stack (RediSearch, índice HNSW / COSINE)        |
 | LLM          | OpenAI / Anthropic / Gemini / Ollama (configurável)   |
@@ -451,6 +451,8 @@ os tokens do LLM via SSE.
 
 ## 🧪 Testes
 
+### Backend (pytest)
+
 Construídos com `pytest`, mockando Redis (`fakeredis`), embeddings e o LLM — então
 **nenhuma chamada real de API** é feita. **Cobertura: 100%** do backend (o
 `pytest` falha automaticamente se cair abaixo do limite de 95%).
@@ -486,6 +488,37 @@ backend/tests/
 ├── test_auth.py                  # login OAuth, tokens, isolamento por usuário
 ├── test_misc.py                  # config, histórico, pequenos edge cases
 └── test_retriever_integration.py # Redis Stack real (opt-in, `-m integration`)
+```
+
+### Frontend (Vitest + Testing Library)
+
+O frontend é **TypeScript** (modo strict) e coberto por uma suíte **Vitest** com
+React Testing Library, mockando a camada de API (`fetch` / `axios`) — sem rede
+real. **38 testes, ~88% de cobertura** (um gate de threshold falha o run se cair).
+
+```bash
+cd frontend
+npm install
+npm run typecheck      # tsc --noEmit (strict)
+npm test               # vitest run
+npm run test:coverage  # com cobertura + gate de threshold
+```
+
+Ou, sem Node local, na raiz do repo: `make test-frontend`.
+
+```
+frontend/src/
+├── api/client.test.ts            # helpers de token, parser de streaming SSE, 401
+├── api/client.axios.test.ts      # chamadas HTTP upload / documents / chat / config
+├── App.test.tsx                  # gating de auth (tela de login vs UI principal)
+├── components/ChatWindow.test.tsx     # enviar no Enter, resposta em stream, erros
+├── components/FileUpload.test.tsx     # filtro de tipo, upload, erro de extração vazia
+├── components/ApiKeyInput.test.tsx    # troca de provedor + persistência da chave
+├── components/SessionSidebar.test.tsx # criar / selecionar / renomear / excluir
+├── components/DocumentList.test.tsx   # lista + remoção
+├── components/SourcesPanel.test.tsx   # recolher / expandir
+├── components/MessageBubble.test.tsx  # usuário vs assistente, pending, fontes
+└── test/setup.ts                 # matchers jest-dom, polyfills do jsdom
 ```
 
 ---
@@ -550,8 +583,10 @@ chat_rag/
 │   ├── tests/                  # suíte pytest (100% de cobertura)
 │   ├── Dockerfile
 │   └── requirements.txt
-├── frontend/                   # React + Vite (Nginx em produção)
-│   ├── src/components/         # ChatWindow, FileUpload, DocumentList, …
+├── frontend/                   # React + TypeScript + Vite (Nginx em produção)
+│   ├── src/components/         # *.tsx: ChatWindow, FileUpload, DocumentList, …
+│   ├── src/**/*.test.{ts,tsx}  # suíte Vitest + Testing Library
+│   ├── tsconfig.json
 │   ├── Dockerfile
 │   └── package.json
 ├── .github/workflows/ci.yml    # CI: pytest + integração + build do frontend
@@ -598,3 +633,5 @@ chat_rag/
 - ✅ Provedor **Google Gemini** (LLM + embeddings), incl. caminho com free tier.
 - ✅ **Uploads canceláveis** e **100%** de cobertura de testes no backend.
 - ✅ **Login opcional Google/GitHub** com isolamento de dados por usuário.
+- ✅ **Frontend em TypeScript** (strict) com suíte **Vitest + Testing Library**
+  (38 testes, ~88% de cobertura) integrada ao CI.

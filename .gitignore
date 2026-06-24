@@ -13,6 +13,7 @@ coverage.xml
 # Node / frontend
 node_modules/
 dist/
+coverage/
 
 # OS / editor
 .DS_Store

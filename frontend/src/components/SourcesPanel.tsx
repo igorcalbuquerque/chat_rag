@@ -1,7 +1,12 @@
 import { useState } from 'react'
+import type { Source } from '../types'
+
+interface SourcesPanelProps {
+  sources?: Source[]
+}
 
 // Collapsible panel showing the source chunks used to build an answer.
-export default function SourcesPanel({ sources }) {
+export default function SourcesPanel({ sources }: SourcesPanelProps) {
   const [open, setOpen] = useState(false)
   if (!sources || sources.length === 0) return null
 

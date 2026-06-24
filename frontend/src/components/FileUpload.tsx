@@ -1,40 +1,56 @@
 import { useRef, useState } from 'react'
 import { uploadFiles } from '../api/client'
 
+interface FileUploadProps {
+  onUploaded?: () => void
+}
+
+type UploadStatus =
+  | { phase: 'uploading'; pct: number }
+  | { phase: 'processing' }
+  | { phase: 'done' }
+  | null
+
+// Shape we read off an Axios/HTTP error without depending on Axios types here.
+interface HttpErrorLike {
+  response?: { status?: number; data?: { detail?: unknown } }
+  message?: string
+  code?: string
+  name?: string
+}
+
 // Turn an Axios/HTTP error into a human message, preferring the backend detail.
-function describeError(err) {
-  if (err?.response?.status === 413) {
+function describeError(err: unknown): string {
+  const e = err as HttpErrorLike
+  if (e?.response?.status === 413) {
     return 'Arquivo muito grande para upload.'
   }
-  const detail = err?.response?.data?.detail
+  const detail = e?.response?.data?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) return detail.map((d) => d.msg).join('; ')
-  return err?.message || 'erro desconhecido'
+  return e?.message || 'erro desconhecido'
 }
 
 // Drag-and-drop + file picker. Reports two distinct phases — "uploading"
 // (bytes sent) and "processing" (server-side ingestion) — and surfaces the
 // real backend error if ingestion fails.
-export default function FileUpload({ onUploaded }) {
-  const inputRef = useRef(null)
-  const abortRef = useRef(null)
+export default function FileUpload({ onUploaded }: FileUploadProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [status, setStatus] = useState(null) // {phase, pct?}
-  const [error, setError] = useState(null)
-  const [note, setNote] = useState(null)
+  const [status, setStatus] = useState<UploadStatus>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [note, setNote] = useState<string | null>(null)
 
-  const busy =
-    status?.phase === 'uploading' || status?.phase === 'processing'
+  const busy = status?.phase === 'uploading' || status?.phase === 'processing'
 
   function cancelUpload() {
     abortRef.current?.abort()
   }
 
-  async function handleFiles(fileList) {
-    if (busy) return // one upload at a time
-    const files = Array.from(fileList).filter((f) =>
-      /\.(pdf|txt|docx)$/i.test(f.name),
-    )
+  async function handleFiles(fileList: FileList | null) {
+    if (busy || !fileList) return // one upload at a time
+    const files = Array.from(fileList).filter((f) => /\.(pdf|txt|docx)$/i.test(f.name))
     if (files.length === 0) {
       setError('Apenas arquivos PDF, TXT ou DOCX são aceitos.')
       return
@@ -67,7 +83,8 @@ export default function FileUpload({ onUploaded }) {
       onUploaded?.()
     } catch (err) {
       setStatus(null)
-      if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') {
+      const e = err as HttpErrorLike
+      if (e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError') {
         setNote('Envio cancelado.')
       } else {
         setError('Falha no upload: ' + describeError(err))

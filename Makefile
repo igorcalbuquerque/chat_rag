@@ -1,13 +1,14 @@
-.PHONY: help up down build test test-local lint logs
+.PHONY: help up down build test test-local test-frontend lint logs
 
 help:
 	@echo "Targets:"
-	@echo "  make up       - build and start all services (docker-compose up --build)"
-	@echo "  make down     - stop services and remove volumes"
-	@echo "  make build    - build all images"
-	@echo "  make logs     - tail service logs"
-	@echo "  make test     - run backend tests in a container"
-	@echo "  make test-local - run backend tests with local Python"
+	@echo "  make up            - build and start all services (docker-compose up --build)"
+	@echo "  make down          - stop services and remove volumes"
+	@echo "  make build         - build all images"
+	@echo "  make logs          - tail service logs"
+	@echo "  make test          - run backend tests in a container"
+	@echo "  make test-local    - run backend tests with local Python"
+	@echo "  make test-frontend - type-check + run frontend tests with coverage"
 
 up:
 	docker-compose up --build
@@ -29,6 +30,12 @@ test:
 # Run tests against a local virtualenv (requires `pip install -r requirements.txt`).
 test-local:
 	cd backend && pytest
+
+# Type-check and run the frontend test suite with coverage (inside a container,
+# no local Node needed).
+test-frontend:
+	docker run --rm -v $(PWD)/frontend:/app -w /app node:20-alpine \
+		sh -c "npm ci && npm run typecheck && npm run test:coverage"
 
 lint:
 	cd backend && python -m py_compile app/*.py app/**/*.py

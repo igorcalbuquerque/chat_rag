@@ -1,11 +1,12 @@
+import type { ReactElement } from 'react'
 import { loginUrl } from '../api/client'
 
-const LABELS = {
+const LABELS: Record<string, string> = {
   google: 'Entrar com Google',
   github: 'Entrar com GitHub',
 }
 
-const ICONS = {
+const ICONS: Record<string, ReactElement> = {
   google: (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -36,10 +37,14 @@ const ICONS = {
   ),
 }
 
+interface LoginScreenProps {
+  providers: string[]
+}
+
 // Shown only when the server reports auth_enabled and the visitor has no valid
 // session. Each button is a top-level navigation to the backend OAuth route
 // (not an XHR), so there is no CORS involved.
-export default function LoginScreen({ providers }) {
+export default function LoginScreen({ providers }: LoginScreenProps) {
   return (
     <div className="login-screen">
       <div className="login-card">

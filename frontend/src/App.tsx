@@ -13,12 +13,15 @@ import {
   logout as apiLogout,
   setToken,
 } from './api/client'
+import type { AppConfig, ChatMessage, DocumentItem, Session, User } from './types'
 
 const STORAGE_KEY = 'chat-rag-sessions'
 
+type MessagesUpdater = ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])
+
 // If the OAuth callback returned a token in the URL fragment, persist it and
 // clean the URL so it doesn't linger in history.
-function captureTokenFromHash() {
+function captureTokenFromHash(): void {
   const hash = window.location.hash
   if (hash.startsWith('#token=')) {
     setToken(decodeURIComponent(hash.slice('#token='.length)))
@@ -26,32 +29,32 @@ function captureTokenFromHash() {
   }
 }
 
-function loadSessions() {
+function loadSessions(): Session[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) return JSON.parse(raw) as Session[]
   } catch {
     /* ignore corrupted storage */
   }
   return null
 }
 
-function newSession(name) {
+function newSession(name: string): Session {
   return { id: crypto.randomUUID(), name, messages: [] }
 }
 
 export default function App() {
-  const [sessions, setSessions] = useState(
+  const [sessions, setSessions] = useState<Session[]>(
     () => loadSessions() || [newSession('Conversa 1')],
   )
-  const [activeId, setActiveId] = useState(() => sessions[0].id)
-  const [documents, setDocuments] = useState([])
+  const [activeId, setActiveId] = useState<string>(() => sessions[0].id)
+  const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false) // mobile drawer
 
   // Auth state. config === null while loading. When auth is disabled the app
   // is open; when enabled, `user` must be set (valid token) to use the app.
-  const [config, setConfig] = useState(null)
-  const [user, setUser] = useState(null)
+  const [config, setConfig] = useState<AppConfig | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [authReady, setAuthReady] = useState(false)
 
   const authRequired = !!config?.auth_enabled
@@ -70,7 +73,7 @@ export default function App() {
           }
         }
       })
-      .catch(() => setConfig({ auth_enabled: false, auth_providers: [] }))
+      .catch(() => setConfig({ auth_enabled: false, auth_providers: [], llm_provider: '', supported_llm_providers: [] }))
       .finally(() => setAuthReady(true))
   }, [])
 
@@ -107,7 +110,7 @@ export default function App() {
 
   // Accepts a functional updater applied against the latest session messages
   // inside setSessions, so rapid streaming updates never use a stale snapshot.
-  function updateMessages(sessionId, updater) {
+  function updateMessages(sessionId: string, updater: MessagesUpdater) {
     setSessions((prev) =>
       prev.map((s) =>
         s.id === sessionId
@@ -129,16 +132,16 @@ export default function App() {
   }
 
   // Selecting a conversation also closes the mobile drawer.
-  function selectSession(id) {
+  function selectSession(id: string) {
     setActiveId(id)
     setSidebarOpen(false)
   }
 
-  function renameSession(id, name) {
+  function renameSession(id: string, name: string) {
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)))
   }
 
-  function deleteSession(id) {
+  function deleteSession(id: string) {
     setSessions((prev) => {
       const next = prev.filter((s) => s.id !== id)
       const safe = next.length ? next : [newSession('Conversa 1')]
@@ -147,7 +150,7 @@ export default function App() {
     })
   }
 
-  async function handleDeleteDocument(fileId) {
+  async function handleDeleteDocument(fileId: string) {
     await deleteDocument(fileId)
     refreshDocuments()
   }
@@ -157,7 +160,7 @@ export default function App() {
   }
 
   if (authRequired && !user) {
-    return <LoginScreen providers={config.auth_providers || []} />
+    return <LoginScreen providers={config?.auth_providers || []} />
   }
 
   return (

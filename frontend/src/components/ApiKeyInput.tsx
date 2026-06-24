@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { API_KEY_STORAGE, PROVIDER_STORAGE, getConfig } from '../api/client'
+import type { AppConfig } from '../types'
 
-const LABELS = {
+const LABELS: Record<string, string> = {
   openai: 'OpenAI',
   anthropic: 'Anthropic',
   gemini: 'Google Gemini',
@@ -14,13 +15,11 @@ const NEEDS_KEY = new Set(['openai', 'anthropic', 'gemini'])
 // request as X-LLM-Provider / X-API-Key). Embeddings stay fixed on the server
 // (the vector index dimension is per model), so only the chat model varies.
 export default function ApiKeyInput() {
-  const [config, setConfig] = useState(null)
+  const [config, setConfig] = useState<AppConfig | null>(null)
   const [provider, setProvider] = useState(
     () => localStorage.getItem(PROVIDER_STORAGE) || '',
   )
-  const [key, setKey] = useState(
-    () => localStorage.getItem(API_KEY_STORAGE) || '',
-  )
+  const [key, setKey] = useState(() => localStorage.getItem(API_KEY_STORAGE) || '')
 
   useEffect(() => {
     getConfig()
@@ -32,12 +31,12 @@ export default function ApiKeyInput() {
       .catch(() => setConfig(null))
   }, [])
 
-  function persistProvider(next) {
+  function persistProvider(next: string) {
     setProvider(next)
     localStorage.setItem(PROVIDER_STORAGE, next)
   }
 
-  function persistKey(next) {
+  function persistKey(next: string) {
     setKey(next)
     if (next) localStorage.setItem(API_KEY_STORAGE, next)
     else localStorage.removeItem(API_KEY_STORAGE)
@@ -50,8 +49,14 @@ export default function ApiKeyInput() {
     <div className="apikey">
       <h3>Modelo de chat</h3>
 
-      <label className="apikey-label">Provedor</label>
-      <select value={provider} onChange={(e) => persistProvider(e.target.value)}>
+      <label className="apikey-label" htmlFor="llm-provider">
+        Provedor
+      </label>
+      <select
+        id="llm-provider"
+        value={provider}
+        onChange={(e) => persistProvider(e.target.value)}
+      >
         {options.length === 0 && <option value="">—</option>}
         {options.map((p) => (
           <option key={p} value={p}>
@@ -62,8 +67,11 @@ export default function ApiKeyInput() {
 
       {needsKey ? (
         <>
-          <label className="apikey-label">Chave de API ({LABELS[provider]})</label>
+          <label className="apikey-label" htmlFor="llm-api-key">
+            Chave de API ({LABELS[provider]})
+          </label>
           <input
+            id="llm-api-key"
             type="password"
             placeholder={`Cole sua chave ${LABELS[provider]}`}
             value={key}
@@ -76,9 +84,7 @@ export default function ApiKeyInput() {
           </small>
         </>
       ) : (
-        <small className="muted">
-          Provedor local — não precisa de chave.
-        </small>
+        <small className="muted">Provedor local — não precisa de chave.</small>
       )}
     </div>
   )

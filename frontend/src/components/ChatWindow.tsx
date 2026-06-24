@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { streamChat } from '../api/client'
 import MessageBubble from './MessageBubble'
+import type { ChatMessage, Session } from '../types'
+
+type MessagesUpdater = ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])
+
+interface ChatWindowProps {
+  session: Session
+  onMessages: (sessionId: string, updater: MessagesUpdater) => void
+}
 
 // Chat history + input. Sends questions with streaming so the answer appears
 // token by token. Enter submits; Shift+Enter inserts a newline.
-export default function ChatWindow({ session, onMessages }) {
+export default function ChatWindow({ session, onMessages }: ChatWindowProps) {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const scrollRef = useRef(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const messages = session.messages
 
   useEffect(() => {
@@ -16,7 +24,7 @@ export default function ChatWindow({ session, onMessages }) {
 
   // Forward the updater straight through to App, pinning the session id so
   // streaming writes always land in the right conversation.
-  function setMessages(updater) {
+  function setMessages(updater: MessagesUpdater) {
     onMessages(session.id, updater)
   }
 
@@ -26,8 +34,8 @@ export default function ChatWindow({ session, onMessages }) {
     setInput('')
     setBusy(true)
 
-    const userMsg = { role: 'user', content: question }
-    const assistantMsg = { role: 'assistant', content: '', sources: [], pending: true }
+    const userMsg: ChatMessage = { role: 'user', content: question }
+    const assistantMsg: ChatMessage = { role: 'assistant', content: '', sources: [], pending: true }
     setMessages((prev) => [...prev, userMsg, assistantMsg])
 
     await streamChat(
