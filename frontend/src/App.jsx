@@ -46,6 +46,7 @@ export default function App() {
   )
   const [activeId, setActiveId] = useState(() => sessions[0].id)
   const [documents, setDocuments] = useState([])
+  const [sidebarOpen, setSidebarOpen] = useState(false) // mobile drawer
 
   // Auth state. config === null while loading. When auth is disabled the app
   // is open; when enabled, `user` must be set (valid token) to use the app.
@@ -124,6 +125,13 @@ export default function App() {
     const session = newSession(`Conversa ${sessions.length + 1}`)
     setSessions((prev) => [...prev, session])
     setActiveId(session.id)
+    setSidebarOpen(false)
+  }
+
+  // Selecting a conversation also closes the mobile drawer.
+  function selectSession(id) {
+    setActiveId(id)
+    setSidebarOpen(false)
   }
 
   function renameSession(id, name) {
@@ -154,8 +162,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <h1 className="brand">Chat com Documentos</h1>
+      {sidebarOpen && (
+        <div className="overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="brand-row">
+          <h1 className="brand">
+            <span className="brand-dot" aria-hidden="true" />
+            Chat com Documentos
+          </h1>
+          <button
+            className="drawer-close"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar menu"
+          >
+            ✕
+          </button>
+        </div>
         {authRequired && user && (
           <div className="user-bar">
             <span className="user-name" title={user.email}>
@@ -175,7 +199,7 @@ export default function App() {
         <SessionSidebar
           sessions={sessions}
           activeId={active.id}
-          onSelect={setActiveId}
+          onSelect={selectSession}
           onCreate={createSession}
           onRename={renameSession}
           onDelete={deleteSession}
@@ -184,6 +208,17 @@ export default function App() {
 
       <main className="main">
         <header className="topbar">
+          <button
+            className="menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Abrir menu"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <h2>{active.name}</h2>
         </header>
         <ChatWindow session={active} onMessages={updateMessages} />

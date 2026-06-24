@@ -8,7 +8,17 @@ export default function MessageBubble({ message }) {
     <div className={`bubble-row ${isUser ? 'user' : 'assistant'}`}>
       <div className="bubble">
         <div className="bubble-content">
-          {message.content || (message.pending ? '▍' : '')}
+          {message.content ? (
+            message.content
+          ) : message.pending ? (
+            <span className="typing" aria-label="Gerando resposta">
+              <span />
+              <span />
+              <span />
+            </span>
+          ) : (
+            ''
+          )}
         </div>
         {!isUser && <SourcesPanel sources={message.sources} />}
       </div>
