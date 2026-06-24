@@ -1,120 +1,210 @@
-# Chat com Documentos via IA — RAG com busca semântica em Redis
+# 💬 Chat com Documentos via IA — RAG com busca semântica em Redis
 
 **🌐 Idioma:** [English](README.md) · **Português (BR)**
 
-Aplicação full-stack que permite fazer **upload de documentos** (PDF/TXT/DOCX) e
-**conversar com eles** usando RAG (Retrieval-Augmented Generation): busca
-semântica vetorial em Redis + geração de resposta por um LLM, com exibição das
-fontes utilizadas.
+> Faça upload dos seus documentos (**PDF / TXT / DOCX**) e **converse com eles**. A
+> aplicação encontra os trechos mais relevantes com **busca vetorial semântica no
+> Redis** e um LLM escreve a resposta **citando exatamente as fontes** que usou —
+> isso é **RAG (Retrieval-Augmented Generation)**.
+
+**🚀 Demo em produção:** <https://chat-rag-web.onrender.com>
+
+> Hospedado no plano gratuito do Render, então a **primeira** requisição pode
+> levar ~30–60s para acordar os serviços. Depois disso fica rápido.
 
 ---
 
-## Arquitetura
+## 📑 Índice
+
+1. [Telas](#-telas)
+2. [Início rápido (TL;DR)](#-início-rápido-tldr) — rodando em 3 comandos
+3. [O que dá para fazer](#-o-que-dá-para-fazer)
+4. [Arquitetura](#-arquitetura)
+5. [Rodar localmente — passo a passo](#-rodar-localmente--passo-a-passo)
+6. [Usando a aplicação](#-usando-a-aplicação)
+7. [Verificar que funciona (terminal)](#-verificar-que-funciona-terminal)
+8. [Variáveis de ambiente](#-variáveis-de-ambiente)
+9. [Endpoints da API](#-endpoints-da-api)
+10. [Pipeline RAG (LangGraph)](#-pipeline-rag-langgraph)
+11. [Testes](#-testes)
+12. [Decisões de arquitetura & trade-offs](#-decisões-de-arquitetura--trade-offs)
+13. [Solução de problemas](#-solução-de-problemas)
+14. [Estrutura do repositório](#-estrutura-do-repositório)
+15. [Diferenciais & cobertura dos requisitos](#-diferenciais--cobertura-dos-requisitos)
+
+---
+
+## 📸 Telas
+
+**Login**
+
+![Tela de login](utils/1.Login.png)
+
+> A tela de login só aparece no ambiente de **produção**
+> (<https://chat-rag-web.onrender.com>), onde a autenticação está habilitada para
+> que cada usuário veja apenas **seus próprios** documentos e conversas. Ao rodar
+> localmente com `docker compose up`, a autenticação vem **desligada por padrão**
+> — você vai direto para a tela inicial, sem necessidade de login.
+
+**Tela inicial**
+
+![Tela inicial](utils/2.Tela_Inicial.png)
+
+---
+
+## ⚡ Início rápido (TL;DR)
+
+Você só precisa de **Docker**. Nada além disso — sem Python, Node ou Redis na sua
+máquina.
+
+```bash
+git clone <url-do-repositório> && cd chat_rag   # 1. baixe o código
+cp .env.example .env                             # 2. crie sua config (já funciona para LLM local)
+docker compose up --build                        # 3. construa e rode tudo
+```
+
+Depois abra **<http://localhost:3000>** 🎉
+
+> 💡 A config padrão roda **100% local e grátis** via [Ollama](https://ollama.com)
+> (é preciso ter o Ollama rodando na sua máquina — veja a [Opção B](#opção-b--100-local-e-grátis-ollama)).
+> Prefere o caminho mais simples? Basta colar uma chave de API no `.env` — veja a
+> [Opção A](#opção-a--com-chave-de-api-mais-simples--rápido-).
+
+Toda a stack sobe com **um único comando** — exatamente como o desafio exige
+(`docker compose up --build`).
+
+---
+
+## ✨ O que dá para fazer
+
+- 📤 **Upload** de PDF, TXT ou DOCX (drag-and-drop ou seletor, vários arquivos de uma vez).
+- 🔎 O texto é **dividido em chunks, vetorizado e indexado** para busca semântica no Redis.
+- 💬 **Pergunte** e receba respostas **transmitidas token a token**, cada uma
+  exibindo as **fontes** em que se baseou.
+- 🗂️ Gerencie **múltiplas sessões de chat** (criar, renomear, excluir).
+- 🧹 **Exclua um documento** e seus vetores são removidos do Redis.
+- 🔌 **Troque o provedor de LLM/embeddings** (OpenAI, Anthropic, Gemini, Ollama)
+  com uma variável de ambiente — ou deixe cada visitante **usar a própria chave**
+  pela interface.
+
+---
+
+## 🏗️ Arquitetura
 
 ```
 ┌──────────────┐      ┌──────────────────────┐      ┌──────────────────┐
 │  Frontend     │ HTTP │   API (FastAPI)       │      │  Redis Stack      │
 │  React + Vite │─────▶│   /upload /chat ...   │─────▶│  RediSearch       │
-│  (Nginx)      │ SSE  │   LangGraph RAG       │      │  (HNSW / COSINE)  │
+│  (Nginx)      │ SSE  │   LangGraph RAG       │◀─────│  (HNSW / COSINE)  │
 └──────────────┘      └──────────┬───────────┘      └──────────────────┘
                                   │
                                   ▼
-                        LLM (OpenAI / Anthropic / Gemini / Ollama)
-                        Embeddings (OpenAI / Gemini / Sentence-Transformers)
+                  LLM         (OpenAI / Anthropic / Gemini / Ollama)
+                  Embeddings  (OpenAI / Gemini / Sentence-Transformers)
 ```
 
-| Camada       | Tecnologia                                   |
-|--------------|----------------------------------------------|
-| Frontend     | React 18 + Vite, servido via Nginx           |
-| API          | Python 3.11, FastAPI, LangChain + LangGraph  |
-| Vector Store | Redis Stack (RediSearch, índice HNSW/COSINE) |
-| LLM          | OpenAI / Anthropic / Gemini / Ollama (configurável) |
-| Embeddings   | OpenAI / Gemini / Sentence-Transformers (config.)  |
-| Infra        | Docker Compose                               |
+| Camada       | Tecnologia                                            |
+|--------------|-------------------------------------------------------|
+| Frontend     | React 18 + Vite, servido via Nginx                    |
+| API          | Python 3.11, FastAPI, LangChain + LangGraph           |
+| Vector Store | Redis Stack (RediSearch, índice HNSW / COSINE)        |
+| LLM          | OpenAI / Anthropic / Gemini / Ollama (configurável)   |
+| Embeddings   | OpenAI / Gemini / Sentence-Transformers (configurável)|
+| Infra        | Docker Compose                                        |
 
 ---
 
-## Como rodar (passo a passo)
+## 🛠️ Rodar localmente — passo a passo
 
-O projeto inteiro sobe com **um único comando** (`docker-compose up --build`).
-Você **não precisa** instalar Python, Node ou Redis na máquina — apenas Docker.
+Esta seção é propositalmente **à prova de erros**: siga de cima a baixo e vai
+funcionar. A única coisa que você instala é o **Docker**.
 
 ### Pré-requisitos
 
-| Requisito                     | Versão mínima | Como verificar             |
-|-------------------------------|---------------|----------------------------|
-| Docker                        | 20.10+        | `docker --version`         |
-| Docker Compose                | v2 (plugin)   | `docker compose version`   |
-| (opcional) Ollama no host     | 0.1+          | `ollama --version`         |
+| Requisito                  | Versão mínima | Como verificar           |
+|----------------------------|---------------|--------------------------|
+| Docker                     | 20.10+        | `docker --version`       |
+| Docker Compose             | v2 (plugin)   | `docker compose version` |
+| (opcional) Ollama no host  | 0.1+          | `ollama --version`       |
 
-> **Docker Compose v1 vs v2:** nas versões novas o comando é `docker compose`
-> (com espaço). Se você usa a v1 antiga, troque por `docker-compose` (com hífen).
-> Os exemplos abaixo usam `docker compose`.
+> **`docker compose` vs `docker-compose`:** o Docker moderno usa
+> `docker compose` (com espaço). Se você estiver na v1 antiga, use
+> `docker-compose` (com hífen) — ambos fazem a mesma coisa.
 
-### Passo 1 — Clonar e entrar no diretório
+### Passo 1 — Clone o repositório
 
 ```bash
-git clone <url-do-repositorio>
+git clone <url-do-repositório>
 cd chat_rag
 ```
 
-### Passo 2 — Criar o arquivo `.env`
+### Passo 2 — Crie seu `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-### Passo 3 — Escolher o provedor de LLM/embeddings
+Esse arquivo guarda suas configurações e chaves. **Ele está no `.gitignore`** —
+suas chaves nunca são commitadas.
 
-O sistema é **provider-agnóstico** (configurado por variáveis no `.env`).
-Escolha **um** dos caminhos abaixo e edite o `.env` de acordo.
+### Passo 3 — Escolha um provedor (escolha UMA opção)
+
+A aplicação é **agnóstica de provedor**: você decide quem gera os embeddings e as
+respostas, só editando o `.env`.
+
+#### Opção A — Com chave de API (mais simples & rápido) ⭐
+
+Nada para instalar além do Docker. Cole sua chave e pronto.
 
 <details open>
-<summary><b>Caminho A — Com chave de API (mais simples e rápido) ⭐</b></summary>
+<summary><b>OpenAI</b></summary>
 
-Não exige instalar nada além do Docker. Basta colar sua chave no `.env`.
-
-**OpenAI:**
 ```env
 LLM_PROVIDER=openai
 EMBEDDING_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini
 EMBEDDING_MODEL=text-embedding-3-small
-OPENAI_API_KEY=sk-...        # sua chave aqui
+OPENAI_API_KEY=sk-...          # 👈 sua chave aqui
 ```
+</details>
 
-**Anthropic (LLM Claude) + embeddings locais gratuitos:**
+<details>
+<summary><b>Anthropic (Claude) + embeddings locais grátis</b></summary>
+
 ```env
 LLM_PROVIDER=anthropic
 EMBEDDING_PROVIDER=sentence-transformers
 LLM_MODEL=claude-3-5-sonnet-latest
 EMBEDDING_MODEL=all-MiniLM-L6-v2
-ANTHROPIC_API_KEY=sk-ant-... # sua chave aqui
+ANTHROPIC_API_KEY=sk-ant-...   # 👈 sua chave aqui
+INSTALL_LOCAL_EMBEDDINGS=true  # embeddings rodam local → ative o extra pesado
 ```
+</details>
 
-**Google Gemini (tem free tier — LLM + embeddings):**
+<details>
+<summary><b>Google Gemini (tem free tier — LLM + embeddings)</b></summary>
+
 ```env
 LLM_PROVIDER=gemini
 EMBEDDING_PROVIDER=gemini
 LLM_MODEL=gemini-1.5-flash
 EMBEDDING_MODEL=models/text-embedding-004
-GOOGLE_API_KEY=...           # sua chave aqui
+GOOGLE_API_KEY=...             # 👈 sua chave aqui
 ```
 </details>
 
-<details>
-<summary><b>Caminho B — 100% local e sem custo (Ollama)</b></summary>
+#### Opção B — 100% local e grátis (Ollama)
 
-Não usa nenhuma API paga. As **embeddings** rodam dentro do container
-(Sentence-Transformers, baixadas automaticamente no primeiro uso). O **LLM**
-roda via [Ollama](https://ollama.com) na sua máquina host:
+Sem API paga. Os **embeddings** rodam dentro do container (Sentence-Transformers,
+baixados no primeiro uso). O **LLM** roda via [Ollama](https://ollama.com) na sua
+máquina host:
 
 ```bash
 # 1. Instale o Ollama (https://ollama.com/download) e baixe um modelo:
 ollama pull llama3
 
 # 2. Garanta que o Ollama está rodando (normalmente sobe sozinho):
-ollama serve   # se ainda não estiver ativo
+ollama serve        # só se ainda não estiver ativo
 ```
 
 `.env`:
@@ -124,98 +214,91 @@ EMBEDDING_PROVIDER=sentence-transformers
 LLM_MODEL=llama3
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 OLLAMA_BASE_URL=http://host.docker.internal:11434
-# Obrigatório para embeddings locais: instala sentence-transformers + torch.
-# Isso deixa a imagem da API bem maior e mais lenta para buildar.
-INSTALL_LOCAL_EMBEDDINGS=true
+INSTALL_LOCAL_EMBEDDINGS=true   # instala sentence-transformers + torch (imagem maior)
 ```
 
-> A imagem padrão é **slim** e traz só a stack de provedores via API. As
-> embeddings locais (Sentence-Transformers + torch) são um extra de build,
-> habilitado por `INSTALL_LOCAL_EMBEDDINGS=true`, então a dependência pesada só
-> é instalada quando realmente necessária.
->
-> O `docker-compose.yml` já mapeia `host.docker.internal` para o host no Linux,
-> então o container `api` enxerga o Ollama da sua máquina.
-</details>
+> A imagem padrão é **slim** (apenas a stack de provedores via API). Embeddings
+> locais (Sentence-Transformers + torch) são um extra opt-in ativado por
+> `INSTALL_LOCAL_EMBEDDINGS=true`, então só são instalados quando você precisa.
+> O `docker-compose.yml` já mapeia `host.docker.internal` no Linux, para o
+> container `api` alcançar o Ollama da sua máquina.
 
-### Passo 4 — Subir a aplicação
+### Passo 4 — Suba tudo
 
 ```bash
 docker compose up --build
 ```
 
-A primeira execução baixa as imagens e instala dependências (pode levar alguns
-minutos). Quando estiver pronto, você verá os logs dos 3 serviços (`redis`,
-`api`, `frontend`). Para rodar em segundo plano, use `docker compose up --build -d`.
+O primeiro run baixa imagens e instala dependências (alguns minutos). Quando
+estiver pronto, você verá os logs dos **3 serviços** (`redis`, `api`,
+`frontend`). Acrescente `-d` para rodar em segundo plano:
+`docker compose up --build -d`.
 
-### Passo 5 — Acessar
+### Passo 5 — Acesse
 
-| Serviço                         | URL                            |
+| O quê                           | URL                            |
 |---------------------------------|--------------------------------|
 | **Aplicação (Frontend)**        | <http://localhost:3000>        |
-| API — documentação Swagger      | <http://localhost:8000/docs>   |
+| API — docs Swagger              | <http://localhost:8000/docs>   |
 | API — health check              | <http://localhost:8000/health> |
-| RedisInsight (inspeção do Redis)| <http://localhost:8001>        |
+| RedisInsight (inspecionar Redis)| <http://localhost:8001>        |
 
-### Passo 6 — Parar / limpar
+### Passo 6 — Parar / resetar
 
 ```bash
 docker compose down       # para os serviços (mantém os dados do Redis)
-docker compose down -v    # para e APAGA o volume do Redis (reset total)
+docker compose down -v    # para E apaga o volume do Redis (reset total)
 ```
 
-> ⚠️ **Ao trocar o modelo de embeddings**, rode `docker compose down -v` antes de
-> subir de novo. A dimensão do índice vetorial é derivada do modelo (1536 para
-> OpenAI, 384 para `all-MiniLM-L6-v2`); um índice criado com outra dimensão é
-> incompatível.
+> ⚠️ **Vai trocar o modelo de embeddings?** Rode `docker compose down -v` antes. A
+> dimensão do índice vetorial vem do modelo (1536 para OpenAI, 384 para
+> `all-MiniLM-L6-v2`); um índice criado com outra dimensão é incompatível.
 
 ---
 
-## Usando a aplicação
+## 🖱️ Usando a aplicação
 
-1. Acesse <http://localhost:3000>.
-2. **Modelo de chat (opcional)**: na barra lateral, escolha o provedor do LLM e
-   cole a chave dele. Pule se o servidor já tiver chave no `.env`, ou se usar um
-   provedor local (Ollama) que não precisa de chave.
-3. **Upload**: arraste um PDF, TXT ou DOCX para a área de upload (ou clique para
-   selecionar). Acompanhe o progresso (envio → processamento); você pode
-   **Cancelar** um envio em andamento — útil para arquivos grandes.
-4. O documento aparece na lista **Documentos** (com o nº de chunks indexados).
-5. **Pergunte** no campo de chat e pressione **Enter**. A resposta aparece em
-   **streaming** (token a token).
-6. Clique em **Fontes** abaixo de cada resposta para ver os trechos usados.
-7. **Múltiplas conversas**: crie/renomeie/exclua sessões na barra lateral
-   (duplo-clique no nome para renomear).
-8. Remova um documento pelo **✕** na lista — os vetores correspondentes são
-   apagados do Redis.
+1. Abra <http://localhost:3000>.
+2. **Modelo de chat (opcional):** na barra lateral, escolha o provedor de LLM e
+   cole a chave dele. Pule isso se o servidor já tem chave no `.env`, ou se você
+   usa um provedor local sem chave (Ollama).
+3. **Upload:** arraste um PDF / TXT / DOCX para a área de upload (ou clique para
+   selecionar). Acompanhe o progresso (envio → processamento). Você pode
+   **Cancelar** um upload em andamento — útil para arquivos grandes.
+4. O arquivo aparece na lista de **Documentos** com o número de chunks indexados.
+5. **Pergunte** no campo de chat e pressione **Enter**. A resposta vem em
+   **streaming**, token a token.
+6. Clique em **Fontes** abaixo de qualquer resposta para ver os trechos usados.
+7. **Múltiplas conversas:** crie / renomeie / exclua sessões na barra lateral
+   (duplo clique no nome para renomear).
+8. Remova um documento com o **✕** na lista — seus vetores são apagados do Redis.
 
 ---
 
-## Verificação rápida (via terminal)
+## ✅ Verificar que funciona (terminal)
 
-Confirme que a stack está saudável e o fluxo end-to-end funciona, sem abrir o
-navegador:
+Confirme o fluxo de ponta a ponta sem abrir o navegador:
 
 ```bash
-# 1. Health check (deve retornar redis: "connected")
+# 1. Health check (espera-se redis: "connected")
 curl http://localhost:8000/health
 # {"status":"ok","redis":"connected"}
 
 # 2. Upload de um documento de exemplo
-echo "O lucro do terceiro trimestre cresceu 20% em relacao ao Q2." > exemplo.txt
+echo "O lucro do terceiro trimestre cresceu 20% em relação ao Q2." > exemplo.txt
 curl -F "files=@exemplo.txt" http://localhost:8000/upload
 # {"files":[{"file_id":"...","name":"exemplo.txt","chunks_indexed":1,...}],...}
 
 # 3. Listar documentos indexados
 curl http://localhost:8000/documents
 
-# 4. Perguntar (RAG)
+# 4. Fazer uma pergunta (RAG)
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"question":"Qual foi o resultado do Q3?","session_id":"demo"}'
 # {"answer":"...","sources":[{"chunk":"...","source":"exemplo.txt","score":0.9}],"session_id":"demo"}
 
-# 5. Streaming (Server-Sent Events)
+# 5. Resposta em streaming (Server-Sent Events)
 curl -N -X POST http://localhost:8000/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"question":"Resuma o documento","session_id":"demo"}'
@@ -223,105 +306,85 @@ curl -N -X POST http://localhost:8000/chat/stream \
 
 ---
 
-## Solução de problemas
+## ⚙️ Variáveis de ambiente
 
-| Sintoma                                   | Causa provável / solução                                                                 |
-|-------------------------------------------|------------------------------------------------------------------------------------------|
-| `/health` retorna `redis: "disconnected"` | O serviço `redis` ainda está subindo — aguarde o healthcheck ou veja `docker compose logs redis`. |
-| Erro de dimensão no upload/chat           | Trocou o modelo de embeddings sem resetar o índice. Rode `docker compose down -v` e suba de novo. |
-| Chat retorna erro com `LLM_PROVIDER=ollama` | Ollama não está rodando ou o modelo não foi baixado (`ollama pull llama3`). Verifique `OLLAMA_BASE_URL`. |
-| Erro de autenticação do provedor (500)    | Chave (no `.env` ou no campo da barra lateral) ausente/ inválida para o provedor escolhido. |
-| "Nenhum texto extraído" num PDF           | PDF escaneado/imagem — habilite OCR (`INSTALL_OCR=true`, veja abaixo) e rebuilde.          |
-| Upload retorna 413 (muito grande)         | Arquivo acima do limite do Nginx (`client_max_body_size`, padrão 300M em `frontend/nginx.conf`). |
-| Porta 3000/8000/6379 já em uso            | Pare o processo conflitante ou ajuste o mapeamento de portas no `docker-compose.yml`.     |
+Referência completa — cada variável, o que faz e seu padrão. No dia a dia você só
+mexe nas de provedor, do [Passo 3](#passo-3--escolha-um-provedor-escolha-uma-opção).
 
-Logs úteis:
-```bash
-docker compose logs -f api       # logs da API
-docker compose logs -f           # todos os serviços
-```
+| Variável                                | Descrição                                          | Padrão                               |
+|-----------------------------------------|----------------------------------------------------|--------------------------------------|
+| `LLM_PROVIDER`                          | `openai` / `anthropic` / `gemini` / `ollama`       | `ollama`                             |
+| `EMBEDDING_PROVIDER`                    | `openai` / `gemini` / `sentence-transformers`      | `sentence-transformers`              |
+| `LLM_MODEL`                             | nome do modelo de chat                             | `llama3`                             |
+| `EMBEDDING_MODEL`                       | nome do modelo de embeddings                       | `all-MiniLM-L6-v2`                   |
+| `OPENAI_API_KEY`                        | chave OpenAI (se aplicável)                        | —                                    |
+| `ANTHROPIC_API_KEY`                     | chave Anthropic (se aplicável)                     | —                                    |
+| `GOOGLE_API_KEY`                        | chave Google Gemini (se aplicável)                 | —                                    |
+| `OLLAMA_BASE_URL`                       | endpoint do Ollama                                 | `http://host.docker.internal:11434`  |
+| `REDIS_URL`                             | URL do Redis (definida automaticamente no compose) | `redis://localhost:6379`             |
+| `CHUNK_SIZE`                            | tamanho do chunk (tokens)                          | `500`                                |
+| `CHUNK_OVERLAP`                         | sobreposição entre chunks (tokens)                 | `50`                                 |
+| `TOP_K`                                 | chunks recuperados por pergunta                    | `5`                                  |
+| `EF_RUNTIME`                            | amplitude de busca HNSW (maior = melhor recall)    | `128`                                |
+| `HISTORY_SIZE`                          | mensagens mantidas por sessão                      | `6`                                  |
+| `INSTALL_LOCAL_EMBEDDINGS`              | flag de build: instala Sentence-Transformers + torch | `false`                           |
+| `INSTALL_OCR`                           | flag de build: instala a stack de OCR para PDFs escaneados | `false`                      |
+| `OCR_LANGUAGE`                          | idiomas do Tesseract (separados por `+`)           | `por+eng`                            |
+| `OCR_DPI`                               | DPI de renderização usado no OCR                   | `200`                                |
+| `AUTH_ENABLED`                          | exigir login Google/GitHub (produção)              | `false`                              |
+| `BACKEND_URL`                           | URL pública do backend (para os redirect URIs OAuth)| —                                   |
+| `FRONTEND_URL`                          | para onde voltar após o login                      | `/`                                  |
+| `SESSION_SECRET`                        | assina o token de login (troque em produção)       | `dev-insecure-…`                     |
+| `GOOGLE_OAUTH_CLIENT_ID` / `..._SECRET` | credenciais do app OAuth do Google                 | —                                    |
+| `GITHUB_OAUTH_CLIENT_ID` / `..._SECRET` | credenciais do app OAuth do GitHub                 | —                                    |
 
----
+### 🔑 Bring-your-own-key (LLM por requisição)
 
-## Variáveis de ambiente
+A barra lateral deixa cada visitante **escolher o provedor de LLM do chat** (a
+partir de `supported_llm_providers` do servidor, veja `/config`) e **colar a
+chave desse provedor**. Ela é enviada por requisição como `X-LLM-Provider` /
+`X-API-Key`, sobrescrevendo a config do servidor só naquela requisição (a chave
+fica apenas no navegador). As chaves também podem vir do `.env` do servidor como
+fallback. Assim, um deploy público **não precisa de nenhuma chave embarcada** —
+cada visitante traz a sua.
 
-| Variável             | Descrição                                          | Default                |
-|----------------------|----------------------------------------------------|------------------------|
-| `LLM_PROVIDER`       | `openai` / `anthropic` / `gemini` / `ollama`       | `ollama`               |
-| `EMBEDDING_PROVIDER` | `openai` / `gemini` / `sentence-transformers`      | `sentence-transformers`|
-| `LLM_MODEL`          | nome do modelo de chat                             | `llama3`               |
-| `EMBEDDING_MODEL`    | nome do modelo de embeddings                       | `all-MiniLM-L6-v2`     |
-| `OPENAI_API_KEY`     | chave OpenAI (se aplicável)                        | —                      |
-| `ANTHROPIC_API_KEY`  | chave Anthropic (se aplicável)                     | —                      |
-| `GOOGLE_API_KEY`     | chave do Google Gemini (se aplicável)              | —                      |
-| `OLLAMA_BASE_URL`    | endpoint do Ollama                                 | `http://host.docker.internal:11434` |
-| `REDIS_URL`          | URL do Redis (auto em compose)                     | `redis://localhost:6379` |
-| `CHUNK_SIZE`         | tamanho do chunk (tokens)                          | `500`                  |
-| `CHUNK_OVERLAP`      | sobreposição entre chunks                          | `50`                   |
-| `TOP_K`              | nº de chunks recuperados por pergunta              | `5`                    |
-| `EF_RUNTIME`         | amplitude da busca HNSW (maior = melhor recall)    | `128`                  |
-| `HISTORY_SIZE`       | nº de mensagens mantidas por sessão                | `6`                    |
-| `INSTALL_LOCAL_EMBEDDINGS` | flag de build: instala Sentence-Transformers + torch | `false`           |
-| `INSTALL_OCR`        | flag de build: instala o OCR p/ PDFs escaneados    | `false`                |
-| `OCR_LANGUAGE`       | idiomas do Tesseract (separados por `+`)           | `por+eng`              |
-| `OCR_DPI`            | DPI de renderização usado no OCR                   | `200`                  |
-| `AUTH_ENABLED`       | exige login Google/GitHub (produção)               | `false`                |
-| `BACKEND_URL`        | URL pública do backend (p/ redirect URI do OAuth)  | —                      |
-| `FRONTEND_URL`       | para onde voltar após o login                      | `/`                    |
-| `SESSION_SECRET`     | assina o token de login (troque em produção)       | `dev-insecure-…`       |
-| `GOOGLE_OAUTH_CLIENT_ID` / `..._SECRET` | credenciais da OAuth app do Google | —                   |
-| `GITHUB_OAUTH_CLIENT_ID` / `..._SECRET` | credenciais da OAuth app do GitHub | —                   |
-
-### Autenticação / login (opcional)
-
-O login vem **desligado por padrão**: rodar localmente não exige contas — é só
-subir e usar. Para uma **publicação na internet**, defina `AUTH_ENABLED=true` e os
-visitantes precisam entrar com **Google ou GitHub**; cada usuário passa a ver
-**apenas os seus** documentos e conversas (os dados são marcados por usuário). É
-independente do BYOK — a chave do LLM na barra lateral continua funcionando igual.
-
-Como funciona: o handshake OAuth acontece no backend (Authlib); ao logar, o
-backend emite um **token assinado** e redireciona de volta à interface, que o
-guarda e o envia como `Authorization: Bearer` em cada requisição. A API segue
-**stateless** (sem cookies cross-site).
-
-**Como ativar (produção):**
-
-1. **Crie as OAuth apps** e registre as URLs de callback:
-   - Google — [Cloud Console → Credenciais](https://console.cloud.google.com/apis/credentials)
-     → *ID do cliente OAuth* (tipo *Web*). Redirect URI autorizada:
-     `<BACKEND_URL>/auth/callback/google`
-   - GitHub — [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
-     → *New OAuth App*. Authorization callback URL:
-     `<BACKEND_URL>/auth/callback/github`
-2. Defina `AUTH_ENABLED=true`, `BACKEND_URL`, `FRONTEND_URL`, um `SESSION_SECRET`
-   forte e os quatro valores `*_OAUTH_*`.
-3. Faça o redeploy. A interface passa a exibir a tela de login até o usuário
-   entrar.
-
-### Provedor do chat + chave de API (traga a sua — BYOK)
-
-Na barra lateral, cada visitante **escolhe o provedor do LLM do chat** (dentre os
-`supported_llm_providers` do servidor, veja `/config`) e **cola a chave desse
-provedor**. São enviados por requisição nos headers `X-LLM-Provider` e
-`X-API-Key`, sobrepondo a config do servidor só naquela requisição (a chave fica
-apenas no navegador).
-
-As chaves também podem vir do **`.env` do servidor** (`OPENAI_API_KEY` /
-`ANTHROPIC_API_KEY` / `GOOGLE_API_KEY`), usado como fallback quando não há header
-— conveniente para rodar local. Assim dá pra publicar o app **sem subir nenhuma
-chave**: cada visitante traz a sua.
-
-> **Embeddings ficam fixos no servidor** (provedor + modelo). Só o **LLM do
-> chat** é por requisição, porque a dimensão do índice vetorial no Redis é
-> definida pelo modelo de embeddings e precisa ser consistente entre todos os
+> **Os embeddings ficam fixos no servidor** (provedor + modelo). Apenas o **LLM
+> do chat** é por requisição, porque a dimensão do índice vetorial no Redis é
+> definida pelo modelo de embeddings e precisa ser consistente em todos os
 > documentos e consultas.
 
-### PDFs escaneados (OCR)
+### 🔒 Autenticação / login (opcional)
 
-PDFs **com camada de texto** e TXT funcionam direto. **PDFs escaneados (só
-imagem)** não têm texto extraível, então a ingestão precisa de OCR. O OCR é um
-extra de build opcional (mantém a imagem padrão pequena):
+O login vem **desligado por padrão** — rodar localmente não exige contas. Para um
+**deploy público**, defina `AUTH_ENABLED=true` e os visitantes precisam entrar com
+**Google ou GitHub**; cada usuário então vê apenas **seus próprios** documentos e
+conversas (os dados são marcados por usuário).
+
+Como funciona: o handshake OAuth acontece no backend (Authlib); no sucesso o
+backend emite um **token assinado** e redireciona de volta para a UI, que o envia
+como `Authorization: Bearer` em toda requisição. A API permanece stateless (sem
+cookies cross-site).
+
+<details>
+<summary><b>Habilitando em produção</b></summary>
+
+1. **Crie os apps OAuth** e registre as URLs de callback:
+   - Google — [Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+     → *OAuth client ID* (tipo *Web*). Redirect URI:
+     `<BACKEND_URL>/auth/callback/google`
+   - GitHub — [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
+     → *New OAuth App*. Callback URL: `<BACKEND_URL>/auth/callback/github`
+2. Defina `AUTH_ENABLED=true`, `BACKEND_URL`, `FRONTEND_URL`, um `SESSION_SECRET`
+   forte e os quatro valores `*_OAUTH_*`.
+3. Faça o redeploy. A UI passa a mostrar a tela de login até o usuário entrar.
+
+</details>
+
+### 📄 PDFs escaneados (OCR)
+
+PDFs **com camada de texto** e TXT funcionam de imediato. **PDFs escaneados / só
+imagem** não têm texto extraível, então a ingestão precisa de OCR — um extra
+opt-in de build (mantém a imagem padrão pequena):
 
 ```env
 # .env
@@ -331,23 +394,22 @@ INSTALL_OCR=true
 docker compose up --build   # reconstrói a imagem da API com Tesseract + PyMuPDF
 ```
 
-Sem isso, subir um PDF escaneado retorna um erro claro em vez de indexar um
-documento vazio. Atenção: o OCR é **lento** para documentos grandes (renderiza e
-lê cada página), então espere tempos de processamento altos em arquivos extensos.
+Sem isso, subir um PDF escaneado retorna um **erro claro** em vez de indexar um
+documento vazio. O OCR é **lento** em arquivos grandes (renderiza e lê cada página).
 
 ---
 
-## Endpoints da API
+## 🌐 Endpoints da API
 
-| Método | Rota                  | Descrição                                  |
-|--------|-----------------------|--------------------------------------------|
-| POST   | `/upload`             | Recebe arquivo(s) e dispara a ingestão     |
-| GET    | `/documents`          | Lista documentos indexados                 |
-| DELETE | `/documents/{id}`     | Remove documento e seus vetores            |
-| POST   | `/chat`               | Pergunta + resposta RAG com fontes         |
-| POST   | `/chat/stream`        | Igual ao `/chat`, com streaming SSE        |
-| GET    | `/health`             | Health check (status + conectividade Redis)|
-| GET    | `/config`             | Providers configurados + se exige chave de API |
+| Método | Rota                | Descrição                                          |
+|--------|---------------------|----------------------------------------------------|
+| POST   | `/upload`           | Recebe arquivo(s) e dispara a ingestão             |
+| GET    | `/documents`        | Lista os documentos indexados                      |
+| DELETE | `/documents/{id}`   | Remove um documento e seus vetores                 |
+| POST   | `/chat`             | Pergunta + resposta RAG com fontes                 |
+| POST   | `/chat/stream`      | Igual ao `/chat`, com streaming SSE                |
+| GET    | `/health`           | Health check (status + conectividade do Redis)     |
+| GET    | `/config`           | Provedores configurados + se exige chave de API    |
 
 Exemplo `POST /chat`:
 ```json
@@ -361,34 +423,37 @@ Exemplo `POST /chat`:
 }
 ```
 
+Docs interativos (Swagger UI): <http://localhost:8000/docs>.
+
 ---
 
-## Pipeline RAG com LangGraph
+## 🧠 Pipeline RAG (LangGraph)
 
-O fluxo é orquestrado por um grafo LangGraph (`app/services/rag_graph.py`) com
-quatro nós, em vez de uma chain simples — o que torna o fluxo explícito e fácil
-de estender com validação, retry ou branching condicional:
+O fluxo é orquestrado por um grafo **LangGraph**
+(`backend/app/services/rag_graph.py`) com quatro nós — em vez de uma chain
+simples — o que torna o fluxo explícito e fácil de estender (validação, retry,
+branching condicional):
 
 ```
 retriever_node → context_builder_node → llm_node → response_formatter_node
 ```
 
-1. **retriever_node** — gera o embedding da pergunta e faz busca KNN no Redis.
-2. **context_builder_node** — monta o prompt com o contexto recuperado e o
-   histórico da sessão.
+1. **retriever_node** — gera o embedding da pergunta e roda uma **busca KNN** no Redis.
+2. **context_builder_node** — monta o prompt com o contexto recuperado **mais o
+   histórico da sessão**.
 3. **llm_node** — chama o LLM configurado com o prompt montado.
-4. **response_formatter_node** — formata a resposta final, incluindo as fontes.
+4. **response_formatter_node** — formata a resposta final, **incluindo as fontes**.
 
-O streaming (`/chat/stream`) reusa os nós de retrieval/contexto e transmite os
-tokens do LLM via SSE.
+O streaming (`/chat/stream`) reaproveita os nós de retrieval/contexto e transmite
+os tokens do LLM via SSE.
 
 ---
 
-## Testes
+## 🧪 Testes
 
-Suíte com `pytest`, mocando Redis (`fakeredis`), embeddings e LLM — **sem
-chamadas reais a APIs**. Cobertura atual: **100%** do backend (o `pytest` falha
-automaticamente se a cobertura cair abaixo do limite de 95%).
+Construídos com `pytest`, mockando Redis (`fakeredis`), embeddings e o LLM — então
+**nenhuma chamada real de API** é feita. **Cobertura: 100%** do backend (o
+`pytest` falha automaticamente se cair abaixo do limite de 95%).
 
 **Opção 1 — via Docker (sem instalar Python):**
 ```bash
@@ -400,13 +465,13 @@ make test
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest                 # ou: make test-local (a partir da raiz)
+pytest                 # ou, na raiz do repo: make test-local
 ```
 
-A configuração do pytest (incluindo `--cov` e o limite de 95%) está em
-`backend/pyproject.toml`.
+> Testes de integração que precisam de um **Redis Stack real** são opt-in: `pytest -m integration`.
 
-Estrutura:
+A configuração do pytest (`--cov` + o limite de 95%) fica em `backend/pyproject.toml`.
+
 ```
 backend/tests/
 ├── conftest.py                   # fixtures: mocks de redis/llm/embeddings, TestClient
@@ -414,72 +479,122 @@ backend/tests/
 ├── test_api_upload.py            # POST /upload
 ├── test_api_chat.py              # POST /chat e /chat/stream (RAG, headers BYOK)
 ├── test_api_documents.py         # GET e DELETE /documents
-├── test_factories.py             # factories de LLM/embeddings (todos os provedores)
-├── test_redis_client.py          # conexão, ping, criação do índice
+├── test_factories.py             # factories de provedor LLM/embeddings (todos)
+├── test_redis_client.py          # conexão, ping, criação de índice
 ├── test_retriever.py             # parsing do resultado KNN
 ├── test_main.py                  # lifespan, /health, /config
 ├── test_auth.py                  # login OAuth, tokens, isolamento por usuário
-├── test_misc.py                  # config, histórico, edge cases
+├── test_misc.py                  # config, histórico, pequenos edge cases
 └── test_retriever_integration.py # Redis Stack real (opt-in, `-m integration`)
 ```
 
 ---
 
-## Decisões de arquitetura e trade-offs
+## 🧭 Decisões de arquitetura & trade-offs
 
-- **Provider configurável (OpenAI/Anthropic/Gemini/Ollama):** factories em
-  `llm.py` e `embeddings.py` desacoplam o restante do código do fornecedor.
-  Permite rodar 100% local e sem custo (Ollama) ou com APIs pagas/grátis,
-  trocando uma env var — e o visitante pode trocar o LLM do chat por requisição
-  (BYOK).
-- **LangGraph em vez de chain simples:** maior controle e extensibilidade do
-  fluxo RAG (nós de validação/retry/branching futuros).
-- **Índice HNSW + COSINE:** bom equilíbrio entre velocidade e qualidade para
-  busca de similaridade semântica; dimensão derivada do modelo de embeddings.
-- **Chunk como HASH no Redis** (`doc:{file_id}:chunk:{n}`): metadados (source,
-  chunk_index, uploaded_at) ficam junto do vetor, simplificando listagem e
-  remoção por `file_id`.
-- **Histórico por sessão no Redis** (lista capada por `HISTORY_SIZE`): contexto
-  de curto prazo sem dependência de estado em memória da API.
-- **Streaming via SSE** com `fetch` no frontend (POST), `proxy_buffering off`
-  no Nginx para entrega token a token.
-- **Auth opcional com um único caminho de código:** toda operação é escopada por
-  um `user_id` (um id público fixo quando o login está off; a identidade OAuth
-  quando on). O mesmo código de ingestão/busca/histórico roda nos dois modos; o
-  retriever apenas adiciona um pré-filtro `@user_id` à consulta KNN. Baseado em
-  token (sem cookies cross-site), então a API segue stateless e funciona mesmo
-  com frontend/backend em domínios separados.
+- **Provedor configurável (OpenAI/Anthropic/Gemini/Ollama):** factories em
+  `llm.py` e `embeddings.py` desacoplam o resto do código do fornecedor. Rode
+  100% local e grátis (Ollama) ou com APIs pagas/gratuitas trocando uma variável
+  — e o visitante pode sobrescrever o LLM do chat por requisição (BYOK).
+- **LangGraph em vez de chain simples:** mais controle e extensibilidade do fluxo
+  RAG (espaço para futuros nós de validação/retry/branching).
+- **Índice HNSW + COSINE:** bom equilíbrio velocidade/qualidade para similaridade
+  semântica; a dimensão é derivada do modelo de embeddings.
+- **Chunk como HASH no Redis** (`doc:{file_id}:chunk:{n}`): os metadados (source,
+  chunk_index, uploaded_at) ficam ao lado do vetor, simplificando listagem e
+  exclusão por `file_id`.
+- **Histórico por sessão no Redis** (lista limitada por `HISTORY_SIZE`): contexto
+  de curto prazo sem depender de estado em memória da API.
+- **Streaming via SSE** com `fetch` no frontend (POST) e `proxy_buffering off` no
+  Nginx para entrega real token a token.
+- **Auth opcional num único caminho de código:** toda operação é escopada por um
+  `user_id` (um id público fixo quando o login está off; a identidade OAuth
+  quando on). O mesmo código de ingestão/retrieval/histórico roda nos dois modos;
+  o retriever apenas adiciona um pré-filtro `@user_id` na consulta KNN. Baseado em
+  token (sem cookies cross-site), então a API segue stateless entre domínios
+  separados de frontend/backend.
 
 ---
 
-## Estrutura do repositório
+## 🩺 Solução de problemas
+
+| Sintoma                                   | Causa provável / solução                                                                  |
+|-------------------------------------------|-------------------------------------------------------------------------------------------|
+| `/health` mostra `redis: "disconnected"`  | O `redis` ainda está subindo — aguarde o healthcheck ou rode `docker compose logs redis`. |
+| Erro de dimensão no upload/chat           | Você trocou o modelo de embeddings sem resetar o índice → `docker compose down -v` e suba de novo. |
+| Chat falha com `LLM_PROVIDER=ollama`      | O Ollama não está rodando ou o modelo não foi baixado (`ollama pull llama3`). Cheque `OLLAMA_BASE_URL`. |
+| Erro de autenticação do provedor (500)    | A chave de API (no `.env` ou na barra lateral) está ausente/inválida para o provedor escolhido. |
+| "No text extracted" num PDF               | O PDF é escaneado/só imagem → habilite OCR (`INSTALL_OCR=true`) e reconstrua.              |
+| Upload retorna 413 (muito grande)         | O arquivo excede o limite do Nginx (`client_max_body_size`, padrão 300M em `frontend/nginx.conf`). |
+| Porta 3000 / 8000 / 6379 já em uso        | Pare o processo conflitante ou ajuste o mapeamento de portas no `docker-compose.yml`.     |
+
+Logs úteis:
+```bash
+docker compose logs -f api    # só os logs da API
+docker compose logs -f        # todos os serviços
+```
+
+---
+
+## 🗂️ Estrutura do repositório
 
 ```
 chat_rag/
-├── backend/        # FastAPI + LangGraph + serviços RAG + testes
-├── frontend/       # React + Vite (Nginx em produção)
-├── .github/workflows/ci.yml   # CI: pytest + build do frontend
-├── docker-compose.yml
+├── backend/                    # FastAPI + LangGraph + serviços RAG + testes
+│   ├── app/
+│   │   ├── main.py             # app FastAPI, CORS, lifespan
+│   │   ├── routers/            # endpoints upload, chat, documents, auth
+│   │   ├── services/           # ingestion, retriever, rag_graph, llm, embeddings, …
+│   │   ├── models/schemas.py   # modelos Pydantic de request/response
+│   │   └── config.py           # configurações via env vars
+│   ├── tests/                  # suíte pytest (100% de cobertura)
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/                   # React + Vite (Nginx em produção)
+│   ├── src/components/         # ChatWindow, FileUpload, DocumentList, …
+│   ├── Dockerfile
+│   └── package.json
+├── .github/workflows/ci.yml    # CI: pytest + integração + build do frontend
+├── docker-compose.yml          # redis + api + frontend (um comando para subir)
+├── render.yaml + DEPLOY.md     # deploy em nuvem (Render)
 ├── .env.example
 ├── Makefile
-├── README.md       # Inglês
-└── README.pt-BR.md # Português (este arquivo)
+├── README.md                   # Inglês
+└── README.pt-BR.md             # Português (este arquivo)
 ```
 
 ---
 
-## Diferenciais implementados
+## 🏅 Diferenciais & cobertura dos requisitos
+
+**Tudo o que o desafio pede — e onde encontrar.**
+
+| Requisito do desafio                                    | Status | Onde |
+|---------------------------------------------------------|:------:|------|
+| Ingestão de **PDF & TXT** (+ chunking com overlap)      | ✅ | `services/ingestion.py`, `CHUNK_SIZE`/`CHUNK_OVERLAP` |
+| Embeddings (OpenAI **ou** Sentence-Transformers)        | ✅ | `services/embeddings.py` |
+| Vetores no **Redis Stack / RediSearch** (HNSW, COSINE)  | ✅ | `services/redis_client.py`, `retriever.py` |
+| Endpoints `/upload`, `/documents`, `DELETE`, `/chat`, `/health` | ✅ | [Endpoints da API](#-endpoints-da-api) |
+| Fluxo **RAG** com **LangChain/LangGraph**               | ✅ | [Pipeline RAG](#-pipeline-rag-langgraph) |
+| **Histórico de conversa** por sessão                    | ✅ | `services/history.py`, `HISTORY_SIZE` |
+| `sources` retornadas em cada resposta                   | ✅ | resposta de `POST /chat` |
+| UI de chat em **React** (upload, progresso, docs, fontes, Enter, loading) | ✅ | `frontend/src/` |
+| **Docker Compose** (api + frontend + redis, volumes, healthchecks) | ✅ | `docker-compose.yml` |
+| Roda com **um comando** `docker compose up --build`     | ✅ | [Início rápido](#-início-rápido-tldr) |
+| **Testes unitários** com mocks (≥60% de cobertura exigida) | ✅ | **100%** de cobertura — [Testes](#-testes) |
+| README: setup, variáveis, decisões, como testar         | ✅ | este arquivo |
+
+**Diferenciais extras implementados (bônus):**
 
 - ✅ **Streaming de respostas** (Server-Sent Events).
 - ✅ **Pipeline RAG com LangGraph** (em vez de chain simples).
-- ✅ **Múltiplas sessões de chat** com nomes customizáveis no frontend.
+- ✅ **Múltiplas sessões de chat** com nomes customizáveis.
 - ✅ **CI com GitHub Actions** (testes + build a cada push).
-- ✅ **Suporte a múltiplos arquivos** no upload.
-- ✅ **Suporte a DOCX** (além dos PDF/TXT obrigatórios).
-- ✅ **OCR para PDFs escaneados** (build opcional, Tesseract).
+- ✅ **Deploy em nuvem** com link funcional (Render).
+- ✅ **Upload de múltiplos arquivos** + **suporte a DOCX** (além do PDF/TXT exigido).
+- ✅ **OCR para PDFs escaneados** (build opt-in, Tesseract).
 - ✅ **Remoção de documentos** com limpeza dos vetores no Redis.
-- ✅ **Traga sua chave (BYOK) + escolha do provedor do LLM** na interface.
-- ✅ **Google Gemini** como provedor (LLM + embeddings), com caminho free-tier.
-- ✅ **Upload cancelável** e cobertura de testes de 100% no backend.
-- ✅ **Login opcional Google/GitHub** com isolamento de documentos/conversas por
-  usuário (off no local, on em produção).
+- ✅ **Bring-your-own-key** + provedor de LLM por requisição escolhido na UI.
+- ✅ Provedor **Google Gemini** (LLM + embeddings), incl. caminho com free tier.
+- ✅ **Uploads canceláveis** e **100%** de cobertura de testes no backend.
+- ✅ **Login opcional Google/GitHub** com isolamento de dados por usuário.
