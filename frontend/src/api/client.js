@@ -56,7 +56,7 @@ export function loginUrl(provider) {
 }
 
 export async function getMe() {
-  const { data } = await api.get('/auth/me')
+  const { data } = await api.get('/auth/me', { headers: authHeaders() })
   return data
 }
 
@@ -88,12 +88,12 @@ export async function getConfig() {
 }
 
 export async function listDocuments() {
-  const { data } = await api.get('/documents')
+  const { data } = await api.get('/documents', { headers: authHeaders() })
   return data
 }
 
 export async function deleteDocument(fileId) {
-  const { data } = await api.delete(`/documents/${fileId}`)
+  const { data } = await api.delete(`/documents/${fileId}`, { headers: authHeaders() })
   return data
 }
 
