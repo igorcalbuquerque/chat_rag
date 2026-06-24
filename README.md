@@ -9,8 +9,20 @@
 
 **🚀 Live demo:** <https://chat-rag-web.onrender.com>
 
-> Hosted on Render's free tier, so the **first** request may take ~30–60s to wake
-> the services up. After that it's snappy.
+> ⚠️ **The production demo runs entirely on free tiers** (Render free for the
+> app + Redis Cloud free for the vector store), so it has real limitations and
+> is meant to **showcase functionality, not production performance**:
+>
+> - **Cold start:** after inactivity the services sleep — the **first** request
+>   may take ~30–60s to wake them up. After that it's responsive.
+> - **Performance:** limited CPU/RAM, so uploading large documents and indexing
+>   many chunks is noticeably slower than a local run, and concurrent usage is
+>   constrained.
+> - **Storage:** the Redis Cloud free tier caps storage (~30 MB), so only a
+>   limited number/size of documents fit, and data may be evicted or reset.
+>
+> For full performance, run it locally (see [Quickstart](#-quickstart-tldr)) or
+> deploy on a paid tier.
 
 ---
 

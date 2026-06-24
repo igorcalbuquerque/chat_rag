@@ -9,8 +9,23 @@
 
 **🚀 Demo em produção:** <https://chat-rag-web.onrender.com>
 
-> Hospedado no plano gratuito do Render, então a **primeira** requisição pode
-> levar ~30–60s para acordar os serviços. Depois disso fica rápido.
+> ⚠️ **A demo em produção roda inteiramente em planos gratuitos** (Render free
+> para a aplicação + Redis Cloud free para o vector store), então tem limitações
+> reais e serve para **demonstrar a funcionalidade, não o desempenho de
+> produção**:
+>
+> - **Cold start:** após um período inativo os serviços hibernam — a
+>   **primeira** requisição pode levar ~30–60s para acordá-los. Depois disso
+>   fica responsivo.
+> - **Desempenho:** CPU/memória limitadas, então subir documentos grandes e
+>   indexar muitos chunks é bem mais lento que rodando localmente, e o uso
+>   simultâneo é restrito.
+> - **Armazenamento:** o plano gratuito do Redis Cloud limita o espaço (~30 MB),
+>   então cabe apenas um número/tamanho reduzido de documentos, e os dados podem
+>   ser descartados ou resetados.
+>
+> Para desempenho pleno, rode localmente (veja o [Quickstart](#-quickstart-tldr))
+> ou faça deploy em um plano pago.
 
 ---
 
