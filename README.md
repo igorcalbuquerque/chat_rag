@@ -1,10 +1,10 @@
-# 💬 Chat with Documents via AI — RAG with semantic search on Redis
+# 💬 Chat with Documents via AI: RAG with semantic search on Redis
 
 **🌐 Language:** **English** · [Português (BR)](README.pt-BR.md)
 
 > Upload your documents (**PDF / TXT / DOCX**) and **talk to them**. The app finds
 > the most relevant passages with **semantic vector search on Redis** and an LLM
-> writes the answer **citing the exact sources** it used — that's
+> writes the answer **citing the exact sources** it used. That's
 > **RAG (Retrieval-Augmented Generation)**.
 
 **🚀 Live demo:** <https://chat-rag-web.onrender.com>
@@ -17,10 +17,10 @@
 ## 📑 Table of contents
 
 1. [Screenshots](#-screenshots)
-2. [Quickstart (TL;DR)](#-quickstart-tldr) — running in 3 commands
+2. [Quickstart (TL;DR)](#-quickstart-tldr) (running in 3 commands)
 3. [What you can do](#-what-you-can-do)
 4. [Architecture](#-architecture)
-5. [Run locally — step by step](#-run-locally--step-by-step)
+5. [Run locally, step by step](#-run-locally-step-by-step)
 6. [Using the application](#-using-the-application)
 7. [Verify it works (terminal)](#-verify-it-works-terminal)
 8. [Environment variables](#-environment-variables)
@@ -43,7 +43,7 @@
 > The login screen only appears in the **production** deployment
 > (<https://chat-rag-web.onrender.com>), where authentication is enabled so each
 > user only sees **their own** documents and conversations. Running locally with
-> `docker compose up`, authentication is **off by default** — you go straight to
+> `docker compose up`, authentication is **off by default**, so you go straight to
 > the main screen, no login required.
 
 **Main screen**
@@ -54,7 +54,7 @@
 
 ## ⚡ Quickstart (TL;DR)
 
-You only need **Docker**. Nothing else — no Python, Node or Redis on your machine.
+You only need **Docker**. Nothing else: no Python, Node or Redis on your machine.
 
 ```bash
 git clone <repository-url> && cd chat_rag   # 1. get the code
@@ -65,11 +65,11 @@ docker compose up --build                    # 3. build & run everything
 Then open **<http://localhost:3000>** 🎉
 
 > 💡 The default config runs **100% local and free** via [Ollama](https://ollama.com)
-> (you'll need Ollama running on your machine — see [Path B](#path-b--100-local-and-free-ollama)).
-> Prefer the simplest path? Just paste an API key into `.env` — see
-> [Path A](#path-a--with-an-api-key-simplest--fastest-).
+> (you'll need Ollama running on your machine, see [Path B](#path-b-100-local-and-free-ollama)).
+> Prefer the simplest path? Just paste an API key into `.env`, see
+> [Path A](#path-a-with-an-api-key-simplest--fastest-).
 
-The whole stack comes up with **a single command** — exactly as the challenge
+The whole stack comes up with **a single command**, exactly as the challenge
 requires (`docker compose up --build`).
 
 ---
@@ -83,7 +83,7 @@ requires (`docker compose up --build`).
 - 🗂️ Manage **multiple chat sessions** (create, rename, delete).
 - 🧹 **Delete a document** and its vectors are removed from Redis.
 - 🔌 **Swap LLM/embeddings provider** (OpenAI, Anthropic, Gemini, Ollama) with one
-  env var — or let each visitor **bring their own key** from the UI.
+  env var, or let each visitor **bring their own key** from the UI.
 
 ---
 
@@ -112,7 +112,7 @@ requires (`docker compose up --build`).
 
 ---
 
-## 🛠️ Run locally — step by step
+## 🛠️ Run locally, step by step
 
 This section is intentionally **foolproof**: follow it top to bottom and it will
 just work. The only thing you install is **Docker**.
@@ -127,30 +127,30 @@ just work. The only thing you install is **Docker**.
 
 > **`docker compose` vs `docker-compose`:** modern Docker uses
 > `docker compose` (a space). If you're on the old v1, use `docker-compose`
-> (a hyphen) instead — both run the same thing.
+> (a hyphen) instead; both run the same thing.
 
-### Step 1 — Clone the repository
+### Step 1: Clone the repository
 
 ```bash
 git clone <repository-url>
 cd chat_rag
 ```
 
-### Step 2 — Create your `.env`
+### Step 2: Create your `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-This file holds your settings and keys. **It is git-ignored** — your keys never
+This file holds your settings and keys. **It is git-ignored**, so your keys never
 get committed.
 
-### Step 3 — Pick a provider (choose ONE path)
+### Step 3: Pick a provider (choose ONE path)
 
 The app is **provider-agnostic**: you decide who generates embeddings and
 answers, just by editing `.env`.
 
-#### Path A — With an API key (simplest & fastest) ⭐
+#### Path A: With an API key (simplest & fastest) ⭐
 
 Nothing to install beyond Docker. Paste your key and you're done.
 
@@ -180,7 +180,7 @@ INSTALL_LOCAL_EMBEDDINGS=true  # embeddings run locally → enable the heavy ext
 </details>
 
 <details>
-<summary><b>Google Gemini (has a free tier — LLM + embeddings)</b></summary>
+<summary><b>Google Gemini (has a free tier: LLM + embeddings)</b></summary>
 
 ```env
 LLM_PROVIDER=gemini
@@ -191,7 +191,7 @@ GOOGLE_API_KEY=...             # 👈 your key here
 ```
 </details>
 
-#### Path B — 100% local and free (Ollama)
+#### Path B: 100% local and free (Ollama)
 
 No paid API. **Embeddings** run inside the container (Sentence-Transformers,
 downloaded on first use). The **LLM** runs via [Ollama](https://ollama.com) on
@@ -221,7 +221,7 @@ INSTALL_LOCAL_EMBEDDINGS=true   # installs sentence-transformers + torch (bigger
 > `docker-compose.yml` already maps `host.docker.internal` on Linux, so the
 > `api` container can reach the Ollama on your machine.
 
-### Step 4 — Start everything
+### Step 4: Start everything
 
 ```bash
 docker compose up --build
@@ -231,16 +231,16 @@ First run pulls images and installs dependencies (a few minutes). When ready
 you'll see logs from all **3 services** (`redis`, `api`, `frontend`). Add `-d`
 to run in the background: `docker compose up --build -d`.
 
-### Step 5 — Open it
+### Step 5: Open it
 
 | What                            | URL                            |
 |---------------------------------|--------------------------------|
 | **Application (Frontend)**      | <http://localhost:3000>        |
-| API — Swagger docs              | <http://localhost:8000/docs>   |
-| API — health check              | <http://localhost:8000/health> |
+| API docs (Swagger)             | <http://localhost:8000/docs>   |
+| API health check               | <http://localhost:8000/health> |
 | RedisInsight (inspect Redis)    | <http://localhost:8001>        |
 
-### Step 6 — Stop / reset
+### Step 6: Stop / reset
 
 ```bash
 docker compose down       # stop services (keeps Redis data)
@@ -260,7 +260,7 @@ docker compose down -v    # stop AND delete the Redis volume (full reset)
    its key. Skip this if the server already has a key in `.env`, or if you use a
    keyless local provider (Ollama).
 3. **Upload:** drag a PDF / TXT / DOCX onto the upload area (or click to pick).
-   Watch the progress (upload → processing). You can **Cancel** mid-upload —
+   Watch the progress (upload → processing). You can **Cancel** mid-upload,
    handy for large files.
 4. The file shows up in the **Documents** list with its number of indexed chunks.
 5. **Ask** in the chat box and hit **Enter**. The answer **streams** in
@@ -268,7 +268,7 @@ docker compose down -v    # stop AND delete the Redis volume (full reset)
 6. Click **Sources** under any answer to see the exact chunks used.
 7. **Multiple conversations:** create / rename / delete sessions in the sidebar
    (double-click a name to rename).
-8. Remove a document with the **✕** in the list — its vectors are deleted from
+8. Remove a document with the **✕** in the list, and its vectors are deleted from
    Redis.
 
 ---
@@ -306,7 +306,7 @@ curl -N -X POST http://localhost:8000/chat/stream \
 
 ## ⚙️ Environment variables
 
-Full reference — every variable, what it does, and its default. You usually only
+Full reference: every variable, what it does, and its default. You usually only
 touch the provider ones from [Step 3](#step-3--pick-a-provider-choose-one-path).
 
 | Variable                                | Description                                       | Default                              |
@@ -343,7 +343,7 @@ The sidebar lets each visitor **pick the chat LLM provider** (from the server's
 sent per request as `X-LLM-Provider` / `X-API-Key`, overriding the server config
 for that request only (the key lives only in the browser). Keys can also come
 from the server `.env` as a fallback. This means a public deploy needs **no
-shipped key** — each visitor brings their own.
+shipped key**: each visitor brings their own.
 
 > **Embeddings stay fixed on the server** (provider + model). Only the **chat
 > LLM** is per-request, because the Redis vector index dimension is set by the
@@ -351,7 +351,7 @@ shipped key** — each visitor brings their own.
 
 ### 🔒 Authentication / login (optional)
 
-Login is **off by default** — local runs need no accounts. For a **public
+Login is **off by default**: local runs need no accounts. For a **public
 deployment**, set `AUTH_ENABLED=true` and visitors must sign in with **Google or
 GitHub**; each user then sees only **their own** documents and conversations
 (data is tagged per user).
@@ -365,10 +365,10 @@ cross-site cookies).
 <summary><b>Enabling it in production</b></summary>
 
 1. **Create the OAuth apps** and register the callback URLs:
-   - Google — [Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+   - Google: [Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
      → *OAuth client ID* (type *Web*). Redirect URI:
      `<BACKEND_URL>/auth/callback/google`
-   - GitHub — [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
+   - GitHub: [Settings → Developer settings → OAuth Apps](https://github.com/settings/developers)
      → *New OAuth App*. Callback URL: `<BACKEND_URL>/auth/callback/github`
 2. Set `AUTH_ENABLED=true`, `BACKEND_URL`, `FRONTEND_URL`, a strong
    `SESSION_SECRET`, and the four `*_OAUTH_*` values.
@@ -379,7 +379,7 @@ cross-site cookies).
 ### 📄 Scanned PDFs (OCR)
 
 PDFs **with a text layer** and TXT work out of the box. **Scanned / image-only
-PDFs** have no extractable text, so ingestion needs OCR — an opt-in build extra
+PDFs** have no extractable text, so ingestion needs OCR, an opt-in build extra
 (keeps the default image small):
 
 ```env
@@ -426,19 +426,19 @@ Interactive docs (Swagger UI): <http://localhost:8000/docs>.
 ## 🧠 RAG pipeline (LangGraph)
 
 The flow is orchestrated by a **LangGraph** graph
-(`backend/app/services/rag_graph.py`) with four nodes — instead of a simple
-chain — which makes the flow explicit and easy to extend (validation, retry,
+(`backend/app/services/rag_graph.py`) with four nodes, instead of a simple
+chain, which makes the flow explicit and easy to extend (validation, retry,
 conditional branching):
 
 ```
 retriever_node → context_builder_node → llm_node → response_formatter_node
 ```
 
-1. **retriever_node** — embeds the question and runs a **KNN search** on Redis.
-2. **context_builder_node** — builds the prompt from the retrieved context **plus
+1. **retriever_node**: embeds the question and runs a **KNN search** on Redis.
+2. **context_builder_node**: builds the prompt from the retrieved context **plus
    the session history**.
-3. **llm_node** — calls the configured LLM with the assembled prompt.
-4. **response_formatter_node** — formats the final answer, **including sources**.
+3. **llm_node**: calls the configured LLM with the assembled prompt.
+4. **response_formatter_node**: formats the final answer, **including sources**.
 
 Streaming (`/chat/stream`) reuses the retrieval/context nodes and streams the LLM
 tokens over SSE.
@@ -449,16 +449,16 @@ tokens over SSE.
 
 ### Backend (pytest)
 
-Built with `pytest`, mocking Redis (`fakeredis`), embeddings and the LLM — so
+Built with `pytest`, mocking Redis (`fakeredis`), embeddings and the LLM, so
 **no real API calls** are made. **Coverage: 100%** of the backend (`pytest`
 fails automatically if it drops below the 95% threshold).
 
-**Option 1 — via Docker (no Python install):**
+**Option 1: via Docker (no Python install):**
 ```bash
 make test
 ```
 
-**Option 2 — locally (requires Python 3.11+):**
+**Option 2: locally (requires Python 3.11+):**
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
@@ -489,7 +489,7 @@ backend/tests/
 ### Frontend (Vitest + Testing Library)
 
 The frontend is **TypeScript** (strict mode) and covered by a **Vitest** suite
-using React Testing Library, mocking the API layer (`fetch` / `axios`) — no real
+using React Testing Library, mocking the API layer (`fetch` / `axios`), with no real
 network. **38 tests, ~88% coverage** (a threshold gate fails the run if it drops).
 
 ```bash
@@ -524,7 +524,7 @@ frontend/src/
 - **Configurable provider (OpenAI/Anthropic/Gemini/Ollama):** factories in
   `llm.py` and `embeddings.py` decouple the rest of the code from the vendor.
   Run 100% local & free (Ollama) or with paid/free APIs by switching one env
-  var — and visitors can override the chat LLM per request (BYOK).
+  var, and visitors can override the chat LLM per request (BYOK).
 - **LangGraph instead of a simple chain:** more control and extensibility of the
   RAG flow (room for future validation/retry/branching nodes).
 - **HNSW + COSINE index:** good speed/quality balance for semantic similarity;
@@ -548,7 +548,7 @@ frontend/src/
 
 | Symptom                                   | Likely cause / fix                                                                       |
 |-------------------------------------------|------------------------------------------------------------------------------------------|
-| `/health` shows `redis: "disconnected"`   | `redis` is still starting — wait for the healthcheck or run `docker compose logs redis`.  |
+| `/health` shows `redis: "disconnected"`   | `redis` is still starting; wait for the healthcheck or run `docker compose logs redis`.  |
 | Dimension error on upload/chat            | You changed the embeddings model without resetting the index → `docker compose down -v`, then up. |
 | Chat fails with `LLM_PROVIDER=ollama`     | Ollama isn't running or the model wasn't pulled (`ollama pull llama3`). Check `OLLAMA_BASE_URL`. |
 | Provider auth error (500)                 | The API key (in `.env` or the sidebar) is missing/invalid for the selected provider.      |
@@ -597,7 +597,7 @@ chat_rag/
 
 ## 🏅 Differentials & requirements coverage
 
-**Everything the challenge asks for — and where to find it.**
+**Everything the challenge asks for, and where to find it.**
 
 | Challenge requirement                                   | Status | Where |
 |---------------------------------------------------------|:------:|-------|
@@ -611,7 +611,7 @@ chat_rag/
 | **React** chat UI (upload, progress, docs, sources, Enter, loading) | ✅ | `frontend/src/` |
 | **Docker Compose** (api + frontend + redis, volumes, healthchecks) | ✅ | `docker-compose.yml` |
 | Runs with **one command** `docker compose up --build`   | ✅ | [Quickstart](#-quickstart-tldr) |
-| **Unit tests** with mocks (≥60% coverage required)      | ✅ | **100%** coverage — [Tests](#-tests) |
+| **Unit tests** with mocks (≥60% coverage required)      | ✅ | **100%** coverage ([Tests](#-tests)) |
 | README: setup, env vars, decisions, how to test         | ✅ | this file |
 
 **Extra differentials implemented (bonus):**

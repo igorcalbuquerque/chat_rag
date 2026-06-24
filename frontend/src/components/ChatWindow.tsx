@@ -88,7 +88,7 @@ export default function ChatWindow({ session, onMessages }: ChatWindowProps) {
             <div>
               <h2>Converse com seus documentos</h2>
               <p>
-                Envie um arquivo e pergunte qualquer coisa sobre ele — as
+                Envie um arquivo e pergunte qualquer coisa sobre ele. As
                 respostas vêm com as fontes usadas.
               </p>
             </div>
