@@ -37,7 +37,8 @@ describe('App', () => {
     )
     // Sidebar brand + active session title are present.
     expect(screen.getAllByText(/chat com documentos/i).length).toBeGreaterThan(0)
-    expect(listDocuments).toHaveBeenCalled()
+    // Documents are loaded by an effect that runs after the commit, so retry.
+    await waitFor(() => expect(listDocuments).toHaveBeenCalled())
   })
 
   it('shows the login screen when auth is required and there is no user', async () => {
