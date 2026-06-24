@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -81,3 +81,32 @@ jobs:
         run: |
           npm install
           npm run build
+
+  deploy:
+    # Gate: only deploy after ALL checks pass, and only on a real push to
+    # master (never on pull requests). If any test job fails, this is skipped.
+    needs: [backend-tests, integration-tests, frontend-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Detect which top-level app changed in this push so we only redeploy the
+      # affected service (e.g. a backend-only commit won't rebuild the frontend).
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+
+      - name: Trigger Render deploy — backend (chat-rag-api)
+        if: steps.changes.outputs.backend == 'true'
+        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_API }}"
+
+      - name: Trigger Render deploy — frontend (chat-rag-web)
+        if: steps.changes.outputs.frontend == 'true'
+        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK_WEB }}"
