@@ -4,6 +4,18 @@ Deploy gratuito com **login Google/GitHub** e **BYOK** (nenhuma chave de IA no
 servidor). Dois serviços (definidos em `render.yaml`): `chat-rag-api` (backend) e
 `chat-rag-web` (frontend estático). O Redis é externo (Redis Cloud).
 
+> ⚠️ **Este deploy roda inteiramente em planos gratuitos** (Render free + Redis
+> Cloud free), então serve para **demonstrar a funcionalidade, não o desempenho
+> de produção**:
+> - **Cold start:** após inatividade os serviços hibernam — a 1ª requisição pode
+>   levar ~30–60s para acordá-los.
+> - **Desempenho:** CPU/memória limitadas — documentos grandes e muitos chunks
+>   indexam mais devagar, e o uso simultâneo é restrito.
+> - **Armazenamento:** Redis Cloud free limita o espaço (~30 MB), então cabe um
+>   número/tamanho reduzido de documentos, e os dados podem ser descartados/resetados.
+>
+> Para desempenho pleno, rode localmente ou faça deploy em um plano pago.
+
 > Ordem importa: as OAuth apps precisam das URLs públicas, que só existem **depois**
 > do 1º deploy. Por isso: sobe tudo → anota URLs → cria OAuth apps → preenche
 > segredos → redeploy.
